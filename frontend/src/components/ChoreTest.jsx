@@ -9,13 +9,13 @@ export default function ChoreTest() {
     const API = import.meta.env.VITE_API_BASE;
 
     useEffect(() => {
-        fetch("/api/chores/current")
-            .then((r) => {
+        fetch(`${API}/api/chores/current`)
+            .then(r => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 return r.json();
             })
             .then(setData)
-            .catch((e) => {
+            .catch(e => {
                 console.error("Fetch-feil:", e);
                 setError(String(e));
             });
