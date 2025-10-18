@@ -6,6 +6,8 @@ export default function ChoreTest() {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
 
+    const API = import.meta.env.VITE_API_BASE;
+
     useEffect(() => {
         fetch("/api/chores/current")
             .then((r) => {
