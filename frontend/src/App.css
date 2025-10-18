@@ -1,42 +1,63 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #1e1e2e;
+  /* mørk lilla/blå */
+  color: #e0e0e0;
+  margin: 0;
   padding: 2rem;
+}
+
+h1 {
   text-align: center;
+  color: #89b4fa;
+  /* blå aksent */
+  margin-bottom: 1rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.vaskeplan {
+  max-width: 420px;
+  margin: 2rem auto;
+  background: #2b2b3d;
+  /* litt lysere kort */
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.vaskeplan:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.vaskeplan h2 {
+  text-align: center;
+  color: #b4befe;
+  margin-bottom: 1rem;
 }
 
-.card {
-  padding: 2em;
+.vaskeplan ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.read-the-docs {
-  color: #888;
+.vaskeplan li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.4rem;
+  border-radius: 8px;
+  background-color: #313244;
+  border: 1px solid #45475a;
+}
+
+.vaskeplan li strong {
+  color: #89b4fa;
+  /* lys blå */
+}
+
+.vaskeplan li:nth-child(even) {
+  background-color: #3b3b54;
 }

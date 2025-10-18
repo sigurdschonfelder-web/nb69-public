@@ -1,4 +1,4 @@
-package sigurdws.NB69;
+package sigurdws.NB69.core;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
