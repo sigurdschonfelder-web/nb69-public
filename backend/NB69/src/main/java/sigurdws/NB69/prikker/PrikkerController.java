@@ -7,7 +7,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = {"http://localhost:5173"}) // dev: tillat frontend
+@CrossOrigin(origins = { "http://localhost:5173",
+        "https://nb69-public.vercel.app/",
+        "https://nb69.no",
+        "https://www.nb69.no" }) // dev: tillat frontend
 public class PrikkerController {
 
     @GetMapping("/api/prikker")
@@ -18,7 +21,6 @@ public class PrikkerController {
                 new PrikkRow("Jørgen", 5),
                 new PrikkRow("Erlend", 1),
                 new PrikkRow("Eilif", 3),
-                new PrikkRow("Sigurd", 0)
-        );
+                new PrikkRow("Sigurd", 0));
     }
 }
