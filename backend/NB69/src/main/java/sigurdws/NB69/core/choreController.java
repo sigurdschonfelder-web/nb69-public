@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/chores")
 @CrossOrigin(origins = {
         "http://localhost:5173",
-        "https://nb69-public.vercel.app/" // Bytt til domene
+        "https://nb69-public.vercel.app/",
+        "https://nb69.no",
+        "https://www.nb69.no"
 })
 public class choreController {
 
