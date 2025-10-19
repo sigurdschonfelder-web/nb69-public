@@ -37,6 +37,6 @@ public class choreAssignment {
             String person = people.get((i + offset) % people.size());
             list.add(new Assignment(tasks.get(i), person));
         }
-        return list;
+        return list.reversed();
     }
 }
