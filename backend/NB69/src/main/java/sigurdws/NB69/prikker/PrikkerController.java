@@ -21,8 +21,8 @@ public class PrikkerController {
         List<PrikkRow> prikker = new ArrayList<>(List.of(
                 new PrikkRow("Andreas", 0),
                 new PrikkRow("Jørgen", 0),
-                new PrikkRow("Erlend", 0),
-                new PrikkRow("Eilif", 0),
+                new PrikkRow("Erlend", 1),
+                new PrikkRow("Eilif", 1),
                 new PrikkRow("Sigurd", 0)));
         return prikker.stream().sorted((o1, o2) -> o2.prikker() - o1.prikker()).toList();
     }
