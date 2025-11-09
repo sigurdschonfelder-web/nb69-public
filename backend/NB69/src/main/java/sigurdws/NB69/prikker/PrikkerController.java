@@ -19,11 +19,11 @@ public class PrikkerController {
     public List<PrikkRow> getPrikker() {
         // Midlertidige data – byttes senere til database/fil om ønskelig
         List<PrikkRow> prikker = new ArrayList<>(List.of(
-                new PrikkRow("Andreas", 0),
+                new PrikkRow("Andreas", 2),
                 new PrikkRow("Jørgen", 0),
-                new PrikkRow("Erlend", 1),
+                new PrikkRow("Erlend", 2),
                 new PrikkRow("Eilif", 2),
-                new PrikkRow("Sigurd", 1)));
+                new PrikkRow("Sigurd", 3)));
         return prikker.stream().sorted((o1, o2) -> o2.prikker() - o1.prikker()).toList();
     }
 }
