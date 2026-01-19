@@ -37,3 +37,7 @@ build/
 *.lock.db
 *.mv.db
 *.trace.db
+
+# Metals
+.metals/
+.bloop/
