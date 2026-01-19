@@ -1,7 +1,19 @@
+error id: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java:org/springframework/web/bind/annotation/PostMapping#
+file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java
+empty definition using pc, found symbol in pc: org/springframework/web/bind/annotation/PostMapping#
+empty definition using semanticdb
+empty definition using fallback
+non-local guesses:
+
+offset: 207
+uri: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java
+text:
+```scala
 package sigurdws.NB69.prikker;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMappi@@ng;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,3 +49,10 @@ public class PrikkerController {
     }
 
 }
+
+```
+
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: org/springframework/web/bind/annotation/PostMapping#

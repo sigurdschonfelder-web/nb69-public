@@ -1,3 +1,14 @@
+error id: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkManager.java:_empty_/JdbcTemplate#
+file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkManager.java
+empty definition using pc, found symbol in pc: _empty_/JdbcTemplate#
+empty definition using semanticdb
+empty definition using fallback
+non-local guesses:
+
+offset: 259
+uri: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkManager.java
+text:
+```scala
 package sigurdws.NB69.prikker;
 
 
@@ -11,7 +22,7 @@ import org.springframework.stereotype.Service;
 public class PrikkManager {
   private final JdbcTemplate jdbc;
 
-  public PrikkManager(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+  public PrikkManager(JdbcTem@@plate jdbc) { this.jdbc = jdbc; }
 
   public List<PrikkRow> getPrikker() {
     return jdbc.query(
@@ -34,3 +45,10 @@ public class PrikkManager {
 }
 
 
+
+```
+
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: _empty_/JdbcTemplate#
