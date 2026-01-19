@@ -7,7 +7,7 @@ export default function Admin({ isLoggedIn, setIsLoggedIn }) {
     
     const handleLogin = (e) => {
         e.preventDefault();
-        if (password === "test") {
+        if (password === "birk") {
             setMessage("Login successful");
             setIsLoggedIn(true);
         } else {
