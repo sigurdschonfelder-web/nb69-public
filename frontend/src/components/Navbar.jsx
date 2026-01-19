@@ -31,6 +31,9 @@ export default function Navbar() {
           <NavLink to="/prikker" className="nb-link" onClick={close}>
             Prikker
           </NavLink>
+          <NavLink to="/admin" className="nb-link" onClick={close}>
+            Admin
+          </NavLink>
         </nav>
       </div>
     </header>

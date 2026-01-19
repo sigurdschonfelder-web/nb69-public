@@ -1,0 +1,16 @@
+[ {
+  "navn" : "Andreas",
+  "prikker" : 2
+}, {
+  "navn" : "Jørgen",
+  "prikker" : 0
+}, {
+  "navn" : "Erlend",
+  "prikker" : 3
+}, {
+  "navn" : "Eilif",
+  "prikker" : 4
+}, {
+  "navn" : "Sigurd",
+  "prikker" : 2
+} ]
