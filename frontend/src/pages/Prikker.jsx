@@ -1,27 +1,35 @@
 import { useEffect, useState } from "react";
 import { fetchPrikker } from "../components/prikker.api";
+import AdminActions from "../components/AdminActions";
 
-export default function Prikker() {
+export default function Prikker({ isLoggedIn }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  const fetchData = async () => {
+    setLoading(true)
+    console.log("IIFE START");
+    try {
+      const data = await fetchPrikker();
+      console.log("fetchPrikker RETURNED:", data);
+      setRows(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log("CATCH:", e);
+      console.error(e);
+      setErr(String(e?.message ?? e));
+    } finally {
+      console.log("FINALLY");
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const data = await fetchPrikker();
-        if (!alive) return;
-        setRows(Array.isArray(data) ? data : []);
-      } catch (e) {
-        console.error(e);
-        if (alive) setErr(String(e?.message ?? e));
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
+    console.log("useEffect START");
+    fetchData();
   }, []);
+
+  
 
   return (
     <div style={{ minHeight: "100vh", background: "#fff" }}>
@@ -43,12 +51,15 @@ export default function Prikker() {
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
-                      <tr key={i}><td>{r.navn}</td><td>{r.prikker}</td></tr>
+                      <tr key={i}><td>{r.navn}</td><td>{r.prikker}</td>
+                      <AdminActions isLoggedIn={isLoggedIn} navn={r.navn} refresh={fetchData}/>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               )}
             </div>
+            <p>{isLoggedIn ? "Du er logget inn som admin" : ""}</p> 
           </div>
         </div>
       </div>

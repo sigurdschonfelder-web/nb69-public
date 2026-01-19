@@ -1,3 +1,14 @@
+error id: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java:_empty_/navn#
+file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java
+empty definition using pc, found symbol in pc: _empty_/navn#
+empty definition using semanticdb
+empty definition using fallback
+non-local guesses:
+
+offset: 1195
+uri: file://<HOME>/KODE/NB69%20-%20App/backend/NB69/src/main/java/sigurdws/NB69/prikker/PrikkerController.java
+text:
+```scala
 package sigurdws.NB69.prikker;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -27,8 +38,21 @@ public class PrikkerController {
     }
 
     @PutMapping("/api/prikker/update")
-    public List<PrikkRow> incrementPrikker(@RequestBody PrikkUpdateRequest req) {
-        return PrikkManager.updatePrikker(req.navn(), req.increase());
+    public List<PrikkRow> incrementPrikker(@RequestBody req) {
+        PrikkManager pc = new PrikkManager();
+        return pc.updatePrikker(@@navn, increase);
     }
 
+    public static void main(String[] args) {
+        PrikkerController pc = new PrikkerController();
+        System.out.println(pc.getPrikker());
+        System.out.println(pc.incrementPrikker("Jørgen", true));
+    }
 }
+
+```
+
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: _empty_/navn#
