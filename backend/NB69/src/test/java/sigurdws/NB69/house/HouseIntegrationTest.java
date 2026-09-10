@@ -1,0 +1,119 @@
+package sigurdws.NB69.house;
+
+import java.time.*;
+import java.util.Map;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest(properties={
+ "spring.datasource.url=jdbc:h2:mem:nb69test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+ "spring.datasource.username=sa", "spring.datasource.password=",
+ "nb69.bootstrap-code=test-bootstrap-code-with-at-least-24-characters"
+})
+@AutoConfigureMockMvc
+class HouseIntegrationTest {
+    @Autowired MockMvc mvc;
+    @Autowired HouseService house;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper mapper;
+    @BeforeEach void clean() {
+        jdbc.update("delete from nb69_assignments"); jdbc.update("delete from nb69_audit");
+        jdbc.update("update nb69_users set password_hash=null, activation_hash=null, activation_expires=null");
+    }
+    @Test void anonymousCannotReadAndResidentsCannotAdminOrUseOldPrikker() throws Exception {
+        mvc.perform(get("/api/weeks")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/users").with(user("andreas").roles("RESIDENT"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/users").with(user("eilif").roles("ADMIN"))).andExpect(status().isOk());
+        mvc.perform(put("/api/prikker/update").with(user("eilif").roles("ADMIN")).with(csrf()).contentType("application/json").content("{}"))
+            .andExpect(status().isForbidden());
+        assertTrue(house.user("eilif").admin()); assertTrue(house.user("sigurd").admin()); assertFalse(house.user("andreas").admin());
+    }
+    @Test void activationIsOneUseAndLoginUsesPersonalPassword() throws Exception {
+        String code = house.invite("andreas", "eilif");
+        String body = mapper.writeValueAsString(Map.of("username","andreas","code",code,"password","A-long-test-password!"));
+        mvc.perform(post("/api/activate").contentType("application/json").content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/activate").with(csrf()).contentType("application/json").content(body)).andExpect(status().isNoContent());
+        mvc.perform(post("/api/activate").with(csrf()).contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        var login = mvc.perform(post("/api/login").with(csrf()).param("username","andreas").param("password","A-long-test-password!"))
+            .andExpect(status().isNoContent()).andReturn();
+        var session = (MockHttpSession) login.getRequest().getSession(false);
+        mvc.perform(get("/api/me").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Andreas")).andExpect(jsonPath("$.admin").value(false));
+        mvc.perform(post("/api/login").with(csrf()).param("username","andreas").param("password","wrong")).andExpect(status().isUnauthorized());
+        String resetCode = house.invite("andreas", "eilif");
+        mvc.perform(post("/api/activate").with(csrf()).contentType("application/json").content(mapper.writeValueAsString(Map.of("username","andreas","code",resetCode,"password","Another-long-password!")))).andExpect(status().isNoContent());
+        mvc.perform(get("/api/me").session(session)).andExpect(status().isUnauthorized());
+    }
+    @Test void completionIsOwnerOnlyIdempotentAndCurrentWeekOnly() throws Exception {
+        var week = house.weeks().get(0); var task = week.assignments().get(0);
+        String route = "/api/weeks/"+week.start()+"/tasks/"+task.id()+"/completion";
+        String other = task.username().equals("eilif") ? "sigurd" : "eilif";
+        mvc.perform(post(route).with(user(other).roles("ADMIN")).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post(route).with(user(task.username()))).andExpect(status().isForbidden());
+        mvc.perform(post(route).with(user(task.username())).with(csrf())).andExpect(status().isNoContent());
+        var first = house.weeks().get(0).assignments().get(0).completedAt(); assertNotNull(first);
+        mvc.perform(post(route).with(user(task.username())).with(csrf())).andExpect(status().isNoContent());
+        assertEquals(first, house.weeks().get(0).assignments().get(0).completedAt());
+        mvc.perform(post("/api/weeks/"+week.start().plusWeeks(1)+"/tasks/0/completion").with(user(task.username())).with(csrf())).andExpect(status().isConflict());
+        assertEquals(1, jdbc.queryForObject("select count(*) from nb69_audit where action='COMPLETE'",Integer.class));
+    }
+    @Test void adminReassignmentPersistsAndCompletedTaskMustBeUndoneFirst() throws Exception {
+        var week=house.weeks().get(0); var task=week.assignments().get(0);
+        String path="/api/admin/weeks/"+week.start()+"/tasks/0";
+        house.complete(week.start(),0,task.username());
+        mvc.perform(put(path).with(user("eilif").roles("ADMIN")).with(csrf()).contentType("application/json").content("{\"username\":\"sigurd\"}"))
+            .andExpect(status().isConflict());
+        mvc.perform(delete(path+"/completion").with(user("eilif").roles("ADMIN")).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(put(path).with(user("eilif").roles("ADMIN")).with(csrf()).contentType("application/json").content("{\"username\":\"sigurd\"}"))
+            .andExpect(status().isNoContent());
+        assertEquals("sigurd",house.weeks().get(0).assignments().get(0).username());
+    }
+    @Test void expiredCodeCannotActivateAccount() throws Exception {
+        String code=house.invite("erlend","eilif");
+        jdbc.update("update nb69_users set activation_expires=? where username='erlend'",OffsetDateTime.now().minusDays(1));
+        mvc.perform(post("/api/activate").with(csrf()).contentType("application/json").content(mapper.writeValueAsString(Map.of("username","erlend","code",code,"password","A-long-test-password!"))))
+            .andExpect(status().isBadRequest());
+    }
+    @Test void browserCsrfCookieFlowWorksThroughLoginAndLogout() throws Exception {
+        String code=house.invite("sigurd","eilif");
+        house.activate("sigurd",code,"Browser-test-password!");
+        var first=mvc.perform(get("/api/csrf")).andExpect(status().isOk()).andReturn();
+        var session=(MockHttpSession) first.getRequest().getSession(false);
+        var token=mapper.readTree(first.getResponse().getContentAsString());
+        var signedIn=mvc.perform(post("/api/login").session(session)
+            .header(token.get("headerName").asText(),token.get("token").asText())
+            .param("username","sigurd").param("password","Browser-test-password!"))
+            .andExpect(status().isNoContent()).andReturn();
+        session=(MockHttpSession) signedIn.getRequest().getSession(false);
+        var fresh=mvc.perform(get("/api/csrf").session(session)).andExpect(status().isOk()).andReturn();
+        var freshToken=mapper.readTree(fresh.getResponse().getContentAsString());
+        mvc.perform(get("/api/admin/users").session(session)).andExpect(status().isOk());
+        mvc.perform(post("/api/logout").session(session)
+            .header(freshToken.get("headerName").asText(),freshToken.get("token").asText()))
+            .andExpect(status().isNoContent());
+        assertTrue(session.isInvalid());
+    }
+    @Test void newIsoYearGetsIndependentAssignmentsAndCompletions() {
+        var encoder=new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+        var december=new HouseService(jdbc,encoder,Clock.fixed(Instant.parse("2026-12-31T12:00:00Z"),ZoneId.of("Europe/Oslo")));
+        var old=december.weeks().get(0);
+        assertEquals(53,old.week());
+        december.complete(old.start(),0,old.assignments().get(0).username());
+        var january=new HouseService(jdbc,encoder,Clock.fixed(Instant.parse("2027-01-04T12:00:00Z"),ZoneId.of("Europe/Oslo")));
+        var next=january.weeks().get(0);
+        assertEquals(1,next.week());
+        assertEquals(LocalDate.of(2027,1,4),next.start());
+        assertTrue(next.assignments().stream().allMatch(task -> task.completedAt()==null));
+        assertNotNull(december.weeks().get(0).assignments().get(0).completedAt());
+    }
+
+}
