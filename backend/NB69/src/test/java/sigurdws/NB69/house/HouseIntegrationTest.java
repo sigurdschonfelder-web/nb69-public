@@ -27,7 +27,7 @@ class HouseIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @BeforeEach void clean() {
-        jdbc.update("delete from nb69_sms_reminders"); jdbc.update("delete from nb69_sms_contacts");
+        jdbc.update("delete from nb69_email_reminders"); jdbc.update("delete from nb69_email_contacts");
         jdbc.update("delete from nb69_assignments"); jdbc.update("delete from nb69_audit");
         jdbc.update("update nb69_users set password_hash=null, activation_hash=null, activation_expires=null");
     }
@@ -136,15 +136,15 @@ class HouseIntegrationTest {
         assertTrue(monday.dashboard(remaining.username()).overdue().isEmpty());
         assertTrue(sunday.weeks().get(0).assignments().get(1).late());
     }
-    @Test void deadlinesAndSmsWindowsFollowDaylightSavingAndYearBoundaries() {
+    @Test void deadlinesAndEmailWindowsFollowDaylightSavingAndYearBoundaries() {
         assertEquals(Instant.parse("2026-03-29T22:00:00Z"),HouseService.deadline(LocalDate.of(2026,3,23)));
         assertEquals(Instant.parse("2026-10-25T23:00:00Z"),HouseService.deadline(LocalDate.of(2026,10,19)));
-        assertNull(SmsReminders.window(Instant.parse("2026-10-25T12:59:59Z")));
-        assertEquals("SUNDAY",SmsReminders.window(Instant.parse("2026-10-25T13:00:00Z")).kind());
-        assertNull(SmsReminders.window(Instant.parse("2026-10-26T06:59:59Z")));
-        assertEquals("MONDAY",SmsReminders.window(Instant.parse("2026-10-26T07:00:00Z")).kind());
-        assertEquals(LocalDate.of(2026,12,28),SmsReminders.window(Instant.parse("2027-01-04T07:00:00Z")).start());
-        assertNull(SmsReminders.window(Instant.parse("2026-10-27T07:00:00Z")));
+        assertNull(EmailReminders.window(Instant.parse("2026-10-25T12:59:59Z")));
+        assertEquals("SUNDAY",EmailReminders.window(Instant.parse("2026-10-25T13:00:00Z")).kind());
+        assertNull(EmailReminders.window(Instant.parse("2026-10-26T06:59:59Z")));
+        assertEquals("MONDAY",EmailReminders.window(Instant.parse("2026-10-26T07:00:00Z")).kind());
+        assertEquals(LocalDate.of(2026,12,28),EmailReminders.window(Instant.parse("2027-01-04T07:00:00Z")).start());
+        assertNull(EmailReminders.window(Instant.parse("2026-10-27T07:00:00Z")));
     }
     @Test void overdueApiIsPersonalAndLateCompletionStillRequiresOwner() throws Exception {
         var start=house.currentStart().minusWeeks(1);
@@ -156,7 +156,7 @@ class HouseIntegrationTest {
         mvc.perform(post("/api/weeks/"+start+"/tasks/0/completion").with(user("sigurd").roles("ADMIN")).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(post("/api/weeks/"+start+"/tasks/0/completion").with(user("andreas")).with(csrf())).andExpect(status().isNoContent());
         mvc.perform(get("/api/dashboard").with(user("andreas"))).andExpect(jsonPath("$.overdue[?(@.id == 0)]").isEmpty());
-        mvc.perform(get("/api/admin/sms").with(user("andreas"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/email").with(user("andreas"))).andExpect(status().isForbidden());
     }
     @Test void missedWeeksArePreservedWithoutCreatingDebtBeforeFirstUse() {
         var first=at("2026-09-07T10:00:00Z");

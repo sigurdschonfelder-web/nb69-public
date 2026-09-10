@@ -22,11 +22,11 @@ CREATE TABLE IF NOT EXISTS nb69_audit (
  detail VARCHAR(255) NOT NULL,
  recorded_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
-CREATE TABLE IF NOT EXISTS nb69_sms_contacts (
+CREATE TABLE IF NOT EXISTS nb69_email_contacts (
  username VARCHAR(32) PRIMARY KEY REFERENCES nb69_users(username),
- phone VARCHAR(20) NOT NULL
+ email VARCHAR(254) NOT NULL
 );
-CREATE TABLE IF NOT EXISTS nb69_sms_reminders (
+CREATE TABLE IF NOT EXISTS nb69_email_reminders (
  week_start DATE NOT NULL,
  task_id INTEGER NOT NULL,
  kind VARCHAR(20) NOT NULL,

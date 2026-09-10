@@ -55,16 +55,29 @@ npm run build
 npm run lint
 ```
 
-## Frister og SMS
+## Frister og e-post
 
-- Frist er mandag kl. 00.00 (altså innen hele søndagen er over), Europe/Oslo. Bekreftelser før dette tidspunktet er i tide. Senere bekreftelser får `late=true` i uke-API-et, uten at tidspunktet tilbakedateres.
-- Søndag fra kl. 14 vises påminnelse på siden. Fra mandag kl. 00 vises tidligere uferdige oppgaver som et personlig hastevarsel med egen «Bekreft utført»-knapp. Bare eieren kan bekrefte disse, også når en admin er innlogget.
-- Når siden har vært ubrukt i flere uker, fylles manglende ukeplaner fra første lagrede uke. Det opprettes ikke restanser for uker før første bruk. Den eksisterende rotasjonen beholdes.
-- SMS sender en påminnelse søndag kl. 14 og en purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. En serverjobb sjekker hvert minutt. Ved nedetid kan den ta igjen påminnelsen senere samme søndag/mandag, men ikke sende en gammel søndagspåminnelse på mandag. En bekreftelse før mandagens utsending avlyser purringen.
-- Koble til [Twilio Messaging](https://www.twilio.com/docs/messaging/api/message-resource) med `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` og `TWILIO_FROM` i Render. Avsenderen må være konfigurert for SMS til Norge. Sett deretter `NB69_SMS_ENABLED=true`. SMS har en kostnad hos leverandøren; ingen konto er opprettet og ingen abonnement er bestilt av denne endringen. Prøvekontoer krever verifiserte mottakernumre hos Twilio.
-- Administratorene legger inn beboernes mobilnumre under Administrasjon → SMS-påminnelser, med landskode (for eksempel +47). Tomt felt fjerner nummeret. Ingen nummer sendes til SMS-tjenesten før utsending er slått på. Bare admin har tilgang til mobilnumrene.
-- Lokalprofilen tvinger SMS av, selv om miljøvariabler for produksjon finnes. Testene bruker en falsk sender og sender ingen faktiske meldinger. Ingen ekte leverandørtest er gjennomført.
-- Render-serveren må være våken på de aktuelle tidene. En sovende gratistjeneste kan ikke garantere planlagte SMS-er. Bruk en alltid kjørende server før aktivering. Det trengs ingen separat Codex-automatisering.
-- `nb69_sms_reminders` lagrer én utsendingsreservasjon per uke, oppgave og påminnelsestype før nettverkskallet. Dette hindrer dobbeltutsending ved gjentatte sjekker og omstart. Oppgaven sjekkes på nytt under lås før sending. En låst oppgave kan bruke inntil nettverkstidsavbruddet på å la en samtidig bekreftelse slippe til.
-- `ACCEPTED` betyr mottatt av leverandøren, ikke bekreftet levert til telefonen. `UNCERTAIN` / `CLAIMED` krever manuell kontroll i Twilio ved feil eller krasj; de sendes ikke automatisk på nytt fordi leveransen kan ha skjedd. Siste 20 forsøk vises for admin. Et manglende mobilnummer bruker ikke opp påminnelsen; et nummer som legges til senere samme utsendingsdag kan derfor fortsatt få melding.
-- Før produksjon: ta databasebackup, kjør testene, legg inn riktige numre, kontroller avsenderoppsettet og utfør en avtalt leverandørtest. Klokkegrenser, feiltilfeller og deduplisering er testet lokalt, men faktisk SMS-leveranse og drift på Render må bekreftes ved tilkobling.
+- Frist er mandag kl. 00.00 (altså innen hele søndagen er over), Europe/Oslo. Bekreftelser før dette tidspunktet er i tide. Senere bekreftelser får `late=true`, uten tilbakedatering.
+- Søndag fra kl. 14 vises påminnelse på siden. Fra mandag kl. 00 vises tidligere uferdige oppgaver som et personlig hastevarsel med egen «Bekreft utført»-knapp. Bare eieren kan bekrefte dem.
+- Manglende ukeplaner fylles fra første lagrede uke når systemet brukes igjen. Ingen restanser opprettes før første bruk.
+- E-postpåminnelse søndag kl. 14 og purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. Serverjobben sjekker hvert minutt og kan ta igjen utsending senere samme søndag/mandag. Ingen gamle søndagspåminnelser sendes på mandag. Bekreftelse før utsending avlyser påminnelsen.
+
+### Koble til Resend
+
+1. Opprett en Resend-konto og legg til et avsenderdomene, gjerne et eget underdomene som `varsler.nb69.no`. Legg inn DNS-postene Resend oppgir hos domenets DNS-leverandør og vent på verifisering. Ikke erstatt eksisterende e-postoppsett for hoveddomenet.
+2. Opprett en API-nøkkel for sending og legg `RESEND_API_KEY` direkte i Render. Ikke legg nøkkelen i Git eller frontend.
+3. Sett `NB69_EMAIL_FROM` til en adresse på det verifiserte domenet, for eksempel `NB69 <paaminnelse@varsler.nb69.no>`. Eksemplet er ikke en adresse vi allerede har opprettet. Domenet må verifiseres før sending til beboerne.
+4. Legg inn beboernes e-postadresser under Administrasjon → E-postpåminnelser på den publiserte nettsiden. Tomt felt fjerner adressen. Adressene er bare tilgjengelige for administratorer og brukes ikke som innloggingsnavn.
+5. Etter en avtalt leverandørtest og kontroll av adresser: sett `NB69_EMAIL_ENABLED=true` og publiser/start serveren på nytt. Kontroller mottak og søppelpostfilter på den faktiske mottakerkontoen. Resend-aksept betyr ikke garantert levering til innboksen.
+
+Resend-dokumentasjon: [domener](https://resend.com/docs/dashboard/domains/introduction), [sending](https://resend.com/docs/api-reference/emails/send-email), [gratisplan og priser](https://resend.com/pricing).
+
+### Drift og overgang fra SMS
+
+- E-post er avslått som standard. Lokalprofilen tvinger `nb69.email.enabled=false` selv om produksjonsvariabler finnes. Ingen reelle e-poster er sendt under utvikling; testene bruker falsk sender/mocket HTTP-klient.
+- Render-serveren må være våken søndag kl. 14 og mandag kl. 08. Ingen egen Codex-automatisering er nødvendig.
+- SMS-koden og SMS-jobben er fjernet. Fjern eventuelle `TWILIO_*` og `NB69_SMS_ENABLED`-variabler fra Render. De brukes ikke lenger. Tidligere SMS-tabeller og eventuelle mobilnumre slettes ikke automatisk; eksisterende data blir stående urørt, mens nye installasjoner bare oppretter e-posttabellene.
+- Nye tabeller: `nb69_email_contacts` og `nb69_email_reminders`. Ta databasebackup før oppstart. Oppgaver, passord, roller og bekreftelser beholdes.
+- Én varig utsendingsreservasjon per uke, oppgave og påminnelsestype hindrer gjentatte utsendinger etter omstart. Resend får også en stabil `Idempotency-Key`. Resend beholder slike nøkler i 24 timer; databasens reservasjon varer videre.
+- `ACCEPTED` betyr mottatt av Resend. `UNCERTAIN` / `CLAIMED` krever manuell kontroll i Resend ved feil/krasj og prøves ikke automatisk igjen fordi levering kan ha skjedd. Siste 20 forsøk vises for admin. Manglende adresse bruker ikke opp påminnelsen.
+- Oppgaven sjekkes igjen under lås før utsending. En samtidig bekreftelse kan vente inntil nettverkstidsavbruddet på ti sekunder.

@@ -61,28 +61,28 @@ function Login({ onLogin }) {
   </main>;
 }
 
-function SmsSettings() {
+function EmailSettings() {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { request('/admin/sms').then(setSettings).catch(err => setError(err.message)); }, []);
+  useEffect(() => { request('/admin/email').then(setSettings).catch(err => setError(err.message)); }, []);
   async function save(event, username) {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    const phone = new FormData(event.currentTarget).get('phone');
+    const email = new FormData(event.currentTarget).get('email');
     try {
-      await request(`/admin/sms/${username}`, json('PUT', { phone }));
-      setSettings(await request('/admin/sms')); setNotice('Mobilnummeret er lagret.');
+      await request(`/admin/email/${username}`, json('PUT', { email }));
+      setSettings(await request('/admin/email')); setNotice('E-postadressen er lagret.');
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
-  const statuses = { ACCEPTED:'Mottatt av SMS-tjenesten', CLAIMED:'Uavklart – sjekk SMS-tjenesten', UNCERTAIN:'Feil eller uavklart – sjekk SMS-tjenesten', SKIPPED:'Utelatt' };
-  return <section className="panel sms-section"><h2>SMS-påminnelser</h2>
-    <p className="muted">Søndag kl. 14 og mandag kl. 08, norsk tid. Bare oppgaver som fortsatt ikke er bekreftet utløser SMS.</p>
+  const statuses = { ACCEPTED:'Mottatt av e-posttjenesten', CLAIMED:'Uavklart – sjekk e-posttjenesten', UNCERTAIN:'Feil eller uavklart – sjekk e-posttjenesten', SKIPPED:'Utelatt' };
+  return <section className="panel email-section"><h2>E-postpåminnelser</h2>
+    <p className="muted">Søndag kl. 14 og mandag kl. 08, norsk tid. Bare oppgaver som fortsatt ikke er bekreftet utløser e-post.</p>
     {error && <p role="alert" className="error">{error}</p>}{notice && <p role="status" className="success">{notice}</p>}
-    {!settings && !error && <p role="status">Henter SMS-oppsett…</p>}
-    {settings && <><p className={settings.ready ? 'success' : 'notice'}>{settings.ready ? 'SMS er aktivert.' : 'SMS er ikke aktivert. Mobilnumrene kan legges inn nå; ingen meldinger sendes før tjenesten er koblet til.'}</p>
-    {settings.contacts.map(contact => <form className="sms-contact" key={contact.username} onSubmit={event => save(event,contact.username)}><label>{contact.name}<input type="tel" name="phone" autoComplete="off" defaultValue={contact.phone} placeholder="+47 …" aria-label={`Mobilnummer til ${contact.name}`} /></label><button className="secondary" disabled={busy}>Lagre mobilnummer</button></form>)}
-    {settings.attempts.length > 0 && <><h3>Siste påminnelser</h3>{settings.attempts.map(attempt => <div className="sms-log" key={`${attempt.start}-${attempt.taskId}-${attempt.kind}`}><strong>{attempt.name} · {attempt.kind === 'SUNDAY' ? 'Søndagspåminnelse' : 'Mandagspurring'}</strong><small>{statuses[attempt.status]} · {when(attempt.attemptedAt)}</small></div>)}<p className="muted">Mottatt av SMS-tjenesten betyr ikke at SMS-en er levert til mobilen. Uavklarte forsøk sendes ikke automatisk på nytt.</p></>}
+    {!settings && !error && <p role="status">Henter e-postoppsett…</p>}
+    {settings && <><p className={settings.ready ? 'success' : 'notice'}>{settings.ready ? 'E-postutsending er aktivert.' : 'E-postutsending er ikke aktivert. E-postadressene kan legges inn nå; ingen meldinger sendes før tjenesten er koblet til.'}</p>
+    {settings.contacts.map(contact => <form className="email-contact" key={contact.username} onSubmit={event => save(event,contact.username)}><label>{contact.name}<input type="email" name="email" autoComplete="off" defaultValue={contact.email} placeholder="navn@eksempel.no" aria-label={`E-postadresse til ${contact.name}`} /></label><button className="secondary" disabled={busy}>Lagre e-postadresse</button></form>)}
+    {settings.attempts.length > 0 && <><h3>Siste påminnelser</h3>{settings.attempts.map(attempt => <div className="email-log" key={`${attempt.start}-${attempt.taskId}-${attempt.kind}`}><strong>{attempt.name} · {attempt.kind === 'SUNDAY' ? 'Søndagspåminnelse' : 'Mandagspurring'}</strong><small>{statuses[attempt.status]} · {when(attempt.attemptedAt)}</small></div>)}<p className="muted">Mottatt av e-posttjenesten betyr ikke at e-posten er levert til innboksen. Uavklarte forsøk sendes ikke automatisk på nytt.</p></>}
     </>}
   </section>;
 }
@@ -102,7 +102,7 @@ function Admin({ weeks, refresh }) {
     <section className="panel"><h2>Beboere</h2><p className="muted">Lag en engangskode når noen trenger å sette et passord. Koden gjelder i 24 timer.</p>
       {users.map(user => <div className="user-row" key={user.username}><div><strong>{user.name}</strong><small>{user.admin ? 'Administrator' : 'Beboer'} · {user.active ? 'Konto aktiv' : 'Venter på aktivering'}</small></div><button className="secondary" disabled={busy} onClick={() => run(async () => { const result = await request(`/admin/users/${user.username}/invite`, {method:'POST'}); setNotice(`Aktiveringskode for ${user.name}: ${result.code}. Del den privat med ${user.name}.`); })}>Lag kode</button></div>)}
     </section>
-    <SmsSettings/>
+    <EmailSettings/>
     {weeks.map(week => <section className="panel admin-week" key={week.start}><h2>{week.label} · uke {week.week}</h2>{week.assignments.map(task => <div className="assignment-edit" key={task.id}><label>{task.task}<select aria-label={`Ansvarlig for ${task.task}, ${week.label}`} value={task.username} disabled={busy || !!task.completedAt} onChange={event => run(async () => {await request(`/admin/weeks/${week.start}/tasks/${task.id}`, json('PUT', {username:event.target.value})); await refresh();})}>{people.map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select></label>{task.completedAt && <button className="text-button" disabled={busy} onClick={() => { if (window.confirm(`Fjerne bekreftelsen for ${task.task}? Oppgaven vises da som ikke utført.`)) run(async () => {await request(`/admin/weeks/${week.start}/tasks/${task.id}/completion`, {method:'DELETE'}); await refresh();}); }}>Angre registrering</button>}</div>)}</section>)}
   </>;
 }
