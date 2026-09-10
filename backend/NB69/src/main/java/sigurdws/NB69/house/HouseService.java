@@ -25,8 +25,22 @@ public class HouseService {
         this.jdbc=jdbc; this.encoder=encoder; this.clock=clock;
     }
     public record Resident(String username, String name, boolean admin, boolean active) {}
-    public record Task(int id, String task, String username, String person, Instant completedAt) {}
-    public record Week(LocalDate start, int week, String label, List<Task> assignments) {}
+    public record Task(int id, String task, String username, String person, Instant completedAt, boolean late) {}
+    public record Week(LocalDate start, int week, String label, Instant dueAt, boolean reminderDue, List<Task> assignments) {}
+    public record Overdue(LocalDate start, int week, int id, String task, Instant dueAt) {}
+    public record Dashboard(List<Week> weeks, List<Overdue> overdue) {}
+    public static final ZoneId OSLO = ZoneId.of("Europe/Oslo");
+    public static Instant deadline(LocalDate start) { return start.plusWeeks(1).atStartOfDay(OSLO).toInstant(); }
+    public static Instant sundayReminder(LocalDate start) { return start.plusDays(6).atTime(14,0).atZone(OSLO).toInstant(); }
+    @Transactional
+    public Dashboard dashboard(String actor) {
+        var weeks = weeks();
+        var overdue = jdbc.query("select week_start,task_id,task_name from nb69_assignments where username=? and week_start<? and completed_at is null order by week_start,task_id", (rs,i) -> {
+            var start = rs.getObject("week_start", LocalDate.class);
+            return new Overdue(start,start.get(WeekFields.ISO.weekOfWeekBasedYear()),rs.getInt("task_id"),rs.getString("task_name"),deadline(start));
+        }, actor,currentStart());
+        return new Dashboard(weeks,overdue);
+    }
     public LocalDate currentStart() { return LocalDate.now(clock).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)); }
     public List<Resident> users() {
         return jdbc.query("select * from nb69_users order by display_name", (rs, i) ->
@@ -70,26 +84,33 @@ public class HouseService {
         // The resident row is a cross-instance lock for weekly snapshot creation.
         jdbc.queryForObject("select username from nb69_users where username='eilif' for update", String.class);
         var start = currentStart();
+        // Fill weeks missed while the server/site was unused, starting only at first use.
+        var last = jdbc.queryForObject("select max(week_start) from nb69_assignments", LocalDate.class);
+        if (last != null) for (var missing=last.plusWeeks(1); missing.isBefore(start); missing=missing.plusWeeks(1)) ensureWeek(missing);
         return List.of(week(start, "Denne uka"), week(start.plusWeeks(1), "Neste uke"));
     }
-    private Week week(LocalDate start, String label) {
+    private void ensureWeek(LocalDate start) {
         int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());
         for (int i=0;i<TASKS.size();i++) {
             String person = PEOPLE.get((i + week) % PEOPLE.size());
             jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) select ?,?,?,? where not exists (select 1 from nb69_assignments where week_start=? and task_id=?)", start, i, TASKS.get(i), person, start, i);
         }
+    }
+    private Week week(LocalDate start, String label) {
+        ensureWeek(start);
+        int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());
         var tasks = jdbc.query("select a.*, u.display_name from nb69_assignments a join nb69_users u on u.username=a.username where week_start=? order by task_id", (rs,i) -> {
             var completed = rs.getObject("completed_at", OffsetDateTime.class);
-            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant());
+            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant(), completed != null && !completed.toInstant().isBefore(deadline(start)));
         }, start);
-        return new Week(start, week, label, tasks);
+        return new Week(start, week, label, deadline(start), !clock.instant().isBefore(sundayReminder(start)) && clock.instant().isBefore(deadline(start)), tasks);
     }
     private void editable(LocalDate start) {
         if (!start.equals(currentStart()) && !start.equals(currentStart().plusWeeks(1))) throw new ResponseStatusException(CONFLICT, "Bare denne og neste uke kan endres. Oppdater siden.");
     }
     @Transactional
     public void complete(LocalDate start, int task, String actor) {
-        if (!start.equals(currentStart())) throw new ResponseStatusException(CONFLICT, "Uka har endret seg. Oppdater siden før du bekrefter.");
+        if (start.isAfter(currentStart())) throw new ResponseStatusException(CONFLICT, "Du kan ikke bekrefte oppgaver for en fremtidig uke.");
         var owners = jdbc.query("select username from nb69_assignments where week_start=? and task_id=? for update", (rs,i) -> rs.getString(1), start, task);
         if (owners.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "Oppgaven finnes ikke.");
         if (!owners.get(0).equals(actor)) throw new ResponseStatusException(FORBIDDEN, "Du kan bare bekrefte dine egne oppgaver.");

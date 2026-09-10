@@ -24,6 +24,7 @@ public class HouseController {
                 sessions.getAllSessions(principal, false).forEach(org.springframework.security.core.session.SessionInformation::expireNow);
         }
     }
+    @GetMapping("/dashboard") public HouseService.Dashboard dashboard(Principal principal) { return house.dashboard(principal.getName()); }
     @GetMapping("/weeks") public List<HouseService.Week> weeks() { return house.weeks(); }
     @PostMapping("/weeks/{start}/tasks/{id}/completion") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void complete(@PathVariable LocalDate start, @PathVariable int id, Principal principal) { house.complete(start,id,principal.getName()); }

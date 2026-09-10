@@ -34,10 +34,10 @@ Lokal H2-database ligger i `.local`, og oppgaver og passord overlever omstart. I
 ## Omfang og drift
 
 - Navn og roller: Eilif og Sigurd er administratorer; Andreas, Jørgen og Erlend er beboere. Endring av disse faste rollene krever en separat kode-/databaseendring.
-- Hver uke får egne oppgaver og egne bekreftelser. Rotasjonen viderefører eksisterende ISO-ukenummerlogikk, også ved årsskifte. Tidssone er Europe/Oslo. Neste uke kan ses, men bare denne uka kan bekreftes.
+- Hver uke får egne oppgaver og egne bekreftelser. Rotasjonen viderefører eksisterende ISO-ukenummerlogikk, også ved årsskifte. Tidssone er Europe/Oslo. Neste uke kan ses, men ikke bekreftes på forhånd. Eldre uferdige oppgaver kan bekreftes etter fristen og lagres som forsinket.
 - Admin kan tildele oppgaver denne og neste uke, angre feilregistreringer og lage aktiverings-/passordresetkoder. Tildeling lagres for den valgte uka, ikke som en varig endring av rotasjonen. Utførte oppgaver må angres før omfordeling. Endringer loggføres i `nb69_audit`.
 - Bekreftelse er idempotent og kontrolleres på serveren mot innlogget bruker. Neste ukes oppgaver viser aldri denne ukas bekreftelser.
-- Første versjon har ingen bilder, frister, varsler eller historikkside. Historiske bekreftelser beholdes i databasen.
+- Fristen er utgangen av søndag, med norsk tid og korrekt sommer-/vintertid. Egne uferdige oppgaver fra tidligere uker vises som et tydelig varsel helt til de blir bekreftet. Ingen bilder eller egen historikkside; historiske bekreftelser beholdes i databasen.
 - Passord lagres med BCrypt. Aktiveringskoder lagres som SHA-256-hash, er engangsbruk og utløper etter 24 timer. Passordendring avslutter gamle økter på samme server.
 - Kjør én Render-instans i denne første versjonen. Økter og begrensning av innloggingsforsøk ligger i minnet. Flere instanser krever delt øktlagring og delt begrensning av innloggingsforsøk. Det er 15 innloggingsforsøk per brukernavn og 60 login/aktiveringsforsøk per direkte nettverksadresse per 15 minutter. Bak proxy kan adressegrensen være delt mellom beboerne.
 - Oppbevar databasebackup i Neon. En utrulling av gammel kode ruller ikke tilbake tabellene, men de er separate og kan stå urørt.
@@ -54,3 +54,17 @@ cd frontend
 npm run build
 npm run lint
 ```
+
+## Frister og SMS
+
+- Frist er mandag kl. 00.00 (altså innen hele søndagen er over), Europe/Oslo. Bekreftelser før dette tidspunktet er i tide. Senere bekreftelser får `late=true` i uke-API-et, uten at tidspunktet tilbakedateres.
+- Søndag fra kl. 14 vises påminnelse på siden. Fra mandag kl. 00 vises tidligere uferdige oppgaver som et personlig hastevarsel med egen «Bekreft utført»-knapp. Bare eieren kan bekrefte disse, også når en admin er innlogget.
+- Når siden har vært ubrukt i flere uker, fylles manglende ukeplaner fra første lagrede uke. Det opprettes ikke restanser for uker før første bruk. Den eksisterende rotasjonen beholdes.
+- SMS sender en påminnelse søndag kl. 14 og en purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. En serverjobb sjekker hvert minutt. Ved nedetid kan den ta igjen påminnelsen senere samme søndag/mandag, men ikke sende en gammel søndagspåminnelse på mandag. En bekreftelse før mandagens utsending avlyser purringen.
+- Koble til [Twilio Messaging](https://www.twilio.com/docs/messaging/api/message-resource) med `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` og `TWILIO_FROM` i Render. Avsenderen må være konfigurert for SMS til Norge. Sett deretter `NB69_SMS_ENABLED=true`. SMS har en kostnad hos leverandøren; ingen konto er opprettet og ingen abonnement er bestilt av denne endringen. Prøvekontoer krever verifiserte mottakernumre hos Twilio.
+- Administratorene legger inn beboernes mobilnumre under Administrasjon → SMS-påminnelser, med landskode (for eksempel +47). Tomt felt fjerner nummeret. Ingen nummer sendes til SMS-tjenesten før utsending er slått på. Bare admin har tilgang til mobilnumrene.
+- Lokalprofilen tvinger SMS av, selv om miljøvariabler for produksjon finnes. Testene bruker en falsk sender og sender ingen faktiske meldinger. Ingen ekte leverandørtest er gjennomført.
+- Render-serveren må være våken på de aktuelle tidene. En sovende gratistjeneste kan ikke garantere planlagte SMS-er. Bruk en alltid kjørende server før aktivering. Det trengs ingen separat Codex-automatisering.
+- `nb69_sms_reminders` lagrer én utsendingsreservasjon per uke, oppgave og påminnelsestype før nettverkskallet. Dette hindrer dobbeltutsending ved gjentatte sjekker og omstart. Oppgaven sjekkes på nytt under lås før sending. En låst oppgave kan bruke inntil nettverkstidsavbruddet på å la en samtidig bekreftelse slippe til.
+- `ACCEPTED` betyr mottatt av leverandøren, ikke bekreftet levert til telefonen. `UNCERTAIN` / `CLAIMED` krever manuell kontroll i Twilio ved feil eller krasj; de sendes ikke automatisk på nytt fordi leveransen kan ha skjedd. Siste 20 forsøk vises for admin. Et manglende mobilnummer bruker ikke opp påminnelsen; et nummer som legges til senere samme utsendingsdag kan derfor fortsatt få melding.
+- Før produksjon: ta databasebackup, kjør testene, legg inn riktige numre, kontroller avsenderoppsettet og utfør en avtalt leverandørtest. Klokkegrenser, feiltilfeller og deduplisering er testet lokalt, men faktisk SMS-leveranse og drift på Render må bekreftes ved tilkobling.

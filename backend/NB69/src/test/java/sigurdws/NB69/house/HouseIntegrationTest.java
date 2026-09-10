@@ -27,6 +27,7 @@ class HouseIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @BeforeEach void clean() {
+        jdbc.update("delete from nb69_sms_reminders"); jdbc.update("delete from nb69_sms_contacts");
         jdbc.update("delete from nb69_assignments"); jdbc.update("delete from nb69_audit");
         jdbc.update("update nb69_users set password_hash=null, activation_hash=null, activation_expires=null");
     }
@@ -53,7 +54,7 @@ class HouseIntegrationTest {
         mvc.perform(post("/api/activate").with(csrf()).contentType("application/json").content(mapper.writeValueAsString(Map.of("username","andreas","code",resetCode,"password","Another-long-password!")))).andExpect(status().isNoContent());
         mvc.perform(get("/api/me").session(session)).andExpect(status().isUnauthorized());
     }
-    @Test void completionIsOwnerOnlyIdempotentAndCurrentWeekOnly() throws Exception {
+    @Test void completionIsOwnerOnlyIdempotentAndRejectsFutureWeeks() throws Exception {
         var week = house.weeks().get(0); var task = week.assignments().get(0);
         String route = "/api/weeks/"+week.start()+"/tasks/"+task.id()+"/completion";
         String other = task.username().equals("eilif") ? "sigurd" : "eilif";
@@ -114,6 +115,54 @@ class HouseIntegrationTest {
         assertEquals(LocalDate.of(2027,1,4),next.start());
         assertTrue(next.assignments().stream().allMatch(task -> task.completedAt()==null));
         assertNotNull(december.weeks().get(0).assignments().get(0).completedAt());
+    }
+
+    private HouseService at(String time) {
+        return new HouseService(jdbc,new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(),Clock.fixed(Instant.parse(time),HouseService.OSLO));
+    }
+    @Test void sundayReminderAndMidnightDeadlineUseOsloTime() {
+        var before=at("2026-09-13T11:59:59Z").weeks().get(0);
+        assertFalse(before.reminderDue());
+        assertTrue(at("2026-09-13T12:00:00Z").weeks().get(0).reminderDue());
+        assertEquals(Instant.parse("2026-09-13T22:00:00Z"),before.dueAt());
+        var sunday=at("2026-09-13T21:59:59Z");
+        var task=sunday.weeks().get(0).assignments().get(0);
+        sunday.complete(before.start(),task.id(),task.username());
+        assertFalse(sunday.weeks().get(0).assignments().get(0).late());
+        var monday=at("2026-09-13T22:00:00Z");
+        var remaining=before.assignments().get(1);
+        assertEquals(1,monday.dashboard(remaining.username()).overdue().size());
+        monday.complete(before.start(),remaining.id(),remaining.username());
+        assertTrue(monday.dashboard(remaining.username()).overdue().isEmpty());
+        assertTrue(sunday.weeks().get(0).assignments().get(1).late());
+    }
+    @Test void deadlinesAndSmsWindowsFollowDaylightSavingAndYearBoundaries() {
+        assertEquals(Instant.parse("2026-03-29T22:00:00Z"),HouseService.deadline(LocalDate.of(2026,3,23)));
+        assertEquals(Instant.parse("2026-10-25T23:00:00Z"),HouseService.deadline(LocalDate.of(2026,10,19)));
+        assertNull(SmsReminders.window(Instant.parse("2026-10-25T12:59:59Z")));
+        assertEquals("SUNDAY",SmsReminders.window(Instant.parse("2026-10-25T13:00:00Z")).kind());
+        assertNull(SmsReminders.window(Instant.parse("2026-10-26T06:59:59Z")));
+        assertEquals("MONDAY",SmsReminders.window(Instant.parse("2026-10-26T07:00:00Z")).kind());
+        assertEquals(LocalDate.of(2026,12,28),SmsReminders.window(Instant.parse("2027-01-04T07:00:00Z")).start());
+        assertNull(SmsReminders.window(Instant.parse("2026-10-27T07:00:00Z")));
+    }
+    @Test void overdueApiIsPersonalAndLateCompletionStillRequiresOwner() throws Exception {
+        var start=house.currentStart().minusWeeks(1);
+        jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) values (?,0,'Kjøkken','andreas')",start);
+        mvc.perform(get("/api/dashboard").with(user("andreas")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.overdue.length()").value(1));
+        mvc.perform(get("/api/dashboard").with(user("sigurd")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.overdue[?(@.id == 0)]").isEmpty());
+        mvc.perform(post("/api/weeks/"+start+"/tasks/0/completion").with(user("sigurd").roles("ADMIN")).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(post("/api/weeks/"+start+"/tasks/0/completion").with(user("andreas")).with(csrf())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/dashboard").with(user("andreas"))).andExpect(jsonPath("$.overdue[?(@.id == 0)]").isEmpty());
+        mvc.perform(get("/api/admin/sms").with(user("andreas"))).andExpect(status().isForbidden());
+    }
+    @Test void missedWeeksArePreservedWithoutCreatingDebtBeforeFirstUse() {
+        var first=at("2026-09-07T10:00:00Z");
+        assertTrue(first.dashboard("eilif").overdue().isEmpty());
+        var later=at("2026-09-28T10:00:00Z");
+        assertEquals(3,later.dashboard("eilif").overdue().size());
     }
 
 }
