@@ -16,6 +16,16 @@ import static org.springframework.http.HttpStatus.*;
 @Service
 public class HouseService {
     static final List<String> PEOPLE = List.of("eilif", "sigurd", "andreas", "jorgen", "erlend");
+    // Separate from account order: account order must not change administrator roles.
+    static final List<String> ROTATION = List.of("andreas", "sigurd", "jorgen", "eilif", "erlend");
+    static final LocalDate ROTATION_START = LocalDate.of(2026, 9, 14);
+    static String scheduledPerson(LocalDate start, int task) {
+        if (start.isBefore(ROTATION_START))
+            return PEOPLE.get((task + start.get(WeekFields.ISO.weekOfWeekBasedYear())) % PEOPLE.size());
+        String previous = PEOPLE.get((task + ROTATION_START.minusWeeks(1).get(WeekFields.ISO.weekOfWeekBasedYear())) % PEOPLE.size());
+        long steps = ChronoUnit.WEEKS.between(ROTATION_START, start) + 1;
+        return ROTATION.get(Math.floorMod(ROTATION.indexOf(previous) + steps, ROTATION.size()));
+    }
     static final List<String> NAMES = List.of("Eilif", "Sigurd", "Andreas", "Jørgen", "Erlend");
     static final List<String> TASKS = List.of("Kjøkken", "Stue & støvsuging", "Bad", "Papp & glass", "Pant");
     private final JdbcTemplate jdbc;
@@ -90,12 +100,17 @@ public class HouseService {
         return List.of(week(start, "Denne uka"), week(start.plusWeeks(1), "Neste uke"));
     }
     private void ensureWeek(LocalDate start) {
-        int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());
+        boolean newRotation = !start.isBefore(ROTATION_START);
         for (int i=0;i<TASKS.size();i++) {
-            String person = PEOPLE.get((i + week) % PEOPLE.size());
-            jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) select ?,?,?,? where not exists (select 1 from nb69_assignments where week_start=? and task_id=?)", start, i, TASKS.get(i), person, start, i);
+            String person = scheduledPerson(start, i);
+            jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username,rotation_version) select ?,?,?,?,? where not exists (select 1 from nb69_assignments where week_start=? and task_id=?)", start, i, TASKS.get(i), person, newRotation ? 1 : 0, start, i);
+            // Upgrade a previously generated preview once, preserving manual assignments and history.
+            if (newRotation && start.isAfter(currentStart())) {
+                jdbc.update("update nb69_assignments set username=?, rotation_version=1 where week_start=? and task_id=? and rotation_version=0 and completed_at is null and not exists (select 1 from nb69_audit where action='ASSIGN' and detail like ?)", person, start, i, start + "/" + i + " -> %");
+            }
         }
     }
+
     private Week week(LocalDate start, String label) {
         ensureWeek(start);
         int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());

@@ -36,3 +36,6 @@ CREATE TABLE IF NOT EXISTS nb69_email_reminders (
  attempted_at TIMESTAMP WITH TIME ZONE NOT NULL,
  PRIMARY KEY (week_start, task_id, kind)
 );
+
+-- Version the default rota without rewriting past weeks or admin overrides.
+ALTER TABLE nb69_assignments ADD COLUMN IF NOT EXISTS rotation_version INTEGER NOT NULL DEFAULT 0;

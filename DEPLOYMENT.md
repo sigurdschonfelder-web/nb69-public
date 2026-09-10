@@ -34,7 +34,7 @@ Lokal H2-database ligger i `.local`, og oppgaver og passord overlever omstart. I
 ## Omfang og drift
 
 - Navn og roller: Eilif og Sigurd er administratorer; Andreas, Jørgen og Erlend er beboere. Endring av disse faste rollene krever en separat kode-/databaseendring.
-- Hver uke får egne oppgaver og egne bekreftelser. Rotasjonen viderefører eksisterende ISO-ukenummerlogikk, også ved årsskifte. Tidssone er Europe/Oslo. Neste uke kan ses, men ikke bekreftes på forhånd. Eldre uferdige oppgaver kan bekreftes etter fristen og lagres som forsinket.
+- Hver uke får egne oppgaver og egne bekreftelser. Fra 14. september 2026 følger hvert område rekkefølgen Andreas → Sigurd → Jørgen → Eilif → Erlend, med sammenhengende uketelling også over årsskiftet. Før dette brukes opprinnelig rotasjon. Allerede lagret historikk og manuelle tildelinger beholdes. Forhåndsgenererte fremtidige uker oppgraderes én gang til ny rotasjon. Tidssone er Europe/Oslo. Neste uke kan ses, men ikke bekreftes på forhånd. Eldre uferdige oppgaver kan bekreftes etter fristen og lagres som forsinket.
 - Admin kan tildele oppgaver denne og neste uke, angre feilregistreringer og lage aktiverings-/passordresetkoder. Tildeling lagres for den valgte uka, ikke som en varig endring av rotasjonen. Utførte oppgaver må angres før omfordeling. Endringer loggføres i `nb69_audit`.
 - Bekreftelse er idempotent og kontrolleres på serveren mot innlogget bruker. Neste ukes oppgaver viser aldri denne ukas bekreftelser.
 - Fristen er utgangen av søndag, med norsk tid og korrekt sommer-/vintertid. Egne uferdige oppgaver fra tidligere uker vises som et tydelig varsel helt til de blir bekreftet. Ingen bilder eller egen historikkside; historiske bekreftelser beholdes i databasen.

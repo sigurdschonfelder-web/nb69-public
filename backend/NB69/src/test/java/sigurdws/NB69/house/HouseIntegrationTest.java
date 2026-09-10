@@ -165,4 +165,36 @@ class HouseIntegrationTest {
         assertEquals(3,later.dashboard("eilif").overdue().size());
     }
 
+    @Test void newRotationFollowsRequestedOrderAcrossYearBoundaries() {
+        var expected=java.util.List.of("andreas","sigurd","jorgen","eilif","erlend");
+        for (int week=0; week<75; week++) {
+            var start=HouseService.ROTATION_START.plusWeeks(week);
+            var assigned=new java.util.HashSet<String>();
+            for (int task=0;task<5;task++) {
+                String person=HouseService.scheduledPerson(start,task);
+                assigned.add(person);
+                assertEquals(expected.get((expected.indexOf(person)+1)%5),HouseService.scheduledPerson(start.plusWeeks(1),task));
+            }
+            assertEquals(5,assigned.size());
+        }
+        assertEquals("sigurd",HouseService.scheduledPerson(HouseService.ROTATION_START,0));
+        assertTrue(house.user("eilif").admin());
+        assertTrue(house.user("sigurd").admin());
+        assertFalse(house.user("andreas").admin());
+    }
+    @Test void alreadyGeneratedNextWeekUsesNewRotationButKeepsManualAssignments() {
+        var start=HouseService.ROTATION_START;
+        jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) values (?,0,'Kjøkken','jorgen')",start);
+        jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) values (?,1,'Stue','andreas')",start);
+        var before=at("2026-09-11T10:00:00Z");
+        before.assign(start,1,"erlend","eilif");
+        var current=before.weeks().get(0);
+        var next=before.weeks().get(1);
+        assertEquals("sigurd",next.assignments().get(0).username());
+        assertEquals("erlend",next.assignments().get(1).username());
+        assertEquals(current,before.weeks().get(0));
+        before.assign(start,0,"andreas","sigurd");
+        assertEquals("andreas",before.weeks().get(1).assignments().get(0).username());
+    }
+
 }
