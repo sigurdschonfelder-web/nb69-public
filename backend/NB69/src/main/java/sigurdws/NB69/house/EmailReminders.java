@@ -20,7 +20,7 @@ public class EmailReminders {
     public EmailReminders(JdbcTemplate jdbc,HouseService house,EmailSender sender,Clock clock,PlatformTransactionManager manager) {
         this.jdbc=jdbc; this.house=house; this.sender=sender; this.clock=clock; transaction=new TransactionTemplate(manager);
     }
-    public record Contact(String username,String name,String email) {}
+    public record Contact(String username,String name,String email,boolean verified) {}
     public record Attempt(LocalDate start,int taskId,String kind,String name,String status,Instant attemptedAt) {}
     public record Settings(boolean ready,List<Contact> contacts,List<Attempt> attempts) {}
     public record Window(LocalDate start,String kind) {}
@@ -34,7 +34,7 @@ public class EmailReminders {
         return null;
     }
     public Settings settings() {
-        var contacts=jdbc.query("select u.username,u.display_name,c.email from nb69_users u left join nb69_email_contacts c on c.username=u.username order by u.display_name", (rs,i) -> new Contact(rs.getString(1),rs.getString(2),Objects.requireNonNullElse(rs.getString(3),"")));
+        var contacts=jdbc.query("select u.username,u.display_name,c.email,c.verified_at from nb69_users u left join nb69_email_contacts c on c.username=u.username order by u.display_name", (rs,i) -> new Contact(rs.getString(1),rs.getString(2),Objects.requireNonNullElse(rs.getString(3),""),rs.getObject(4)!=null));
         var attempts=jdbc.query("select r.*,u.display_name from nb69_email_reminders r join nb69_users u on u.username=r.username order by attempted_at desc limit 20", (rs,i) -> new Attempt(rs.getObject("week_start",LocalDate.class),rs.getInt("task_id"),rs.getString("kind"),rs.getString("display_name"),rs.getString("status"),rs.getObject("attempted_at",OffsetDateTime.class).toInstant()));
         return new Settings(sender.ready(),contacts,attempts);
     }
@@ -61,7 +61,7 @@ public class EmailReminders {
                 // Serialize claims using the assignment lock, across processes as well.
                 var owners=jdbc.query("select username from nb69_assignments where week_start=? and task_id=? and completed_at is null for update",(rs,i)->rs.getString(1),window.start(),candidate.id());
                 if (owners.isEmpty() || !owners.get(0).equals(candidate.username())) return false;
-                if (jdbc.queryForObject("select count(*) from nb69_email_contacts where username=?",Integer.class,candidate.username())==0) return false;
+                if (jdbc.queryForObject("select count(*) from nb69_email_contacts where username=? and verified_at is not null",Integer.class,candidate.username())==0) return false;
                 if (jdbc.queryForObject("select count(*) from nb69_email_reminders where week_start=? and task_id=? and kind=?",Integer.class,window.start(),candidate.id(),window.kind())>0) return false;
                 jdbc.update("insert into nb69_email_reminders (week_start,task_id,kind,username,status,attempted_at) values (?,?,?,?,?,?)",window.start(),candidate.id(),window.kind(),candidate.username(),"CLAIMED",OffsetDateTime.now(clock));
                 return true;
@@ -70,7 +70,8 @@ public class EmailReminders {
             // A durable CLAIMED row prevents a second email after an uncertain network outcome or crash.
             transaction.executeWithoutResult(status -> {
                 var owners=jdbc.query("select username from nb69_assignments where week_start=? and task_id=? and completed_at is null for update",(rs,i)->rs.getString(1),window.start(),candidate.id());
-                var addresses=jdbc.query("select email from nb69_email_contacts where username=?",(rs,i)->rs.getString(1),candidate.username());
+                jdbc.queryForObject("select username from nb69_users where username=? for update",String.class,candidate.username());
+                var addresses=jdbc.query("select email from nb69_email_contacts where username=? and verified_at is not null",(rs,i)->rs.getString(1),candidate.username());
                 if (owners.isEmpty() || !owners.get(0).equals(candidate.username()) || addresses.isEmpty() || !window.equals(window(clock.instant()))) {
                     finish(window,candidate.id(),"SKIPPED",null); return;
                 }

@@ -30,6 +30,7 @@ class EmailRemindersTest {
         var sunday=at("2026-09-13T12:00:00Z");var house=house(sunday);var tasks=house.weeks().get(0).assignments();
         var reminders=reminders(sunday,false);
         for(var user:house.users()) reminders.contact(user.username(),"resident@example.com");
+        jdbc.update("update nb69_email_contacts set verified_at=current_timestamp");
         house.complete(house.currentStart(),tasks.get(0).id(),tasks.get(0).username());
         reminders.dispatch();reminders.dispatch();assertEquals(4,sent.size());
         // A new service after restart must not send a second Sunday email.
@@ -42,7 +43,7 @@ class EmailRemindersTest {
     @Test void unavailableContactDoesNotConsumeReminderAndFailureIsNotRetried() {
         var clock=at("2026-09-13T12:00:00Z");var service=reminders(clock,true);
         house(clock).weeks();service.dispatch();assertEquals(0,sent.size());
-        service.contact("eilif"," resident@example.com ");service.dispatch();service.dispatch();
+        service.contact("eilif"," resident@example.com ");jdbc.update("update nb69_email_contacts set verified_at=current_timestamp");service.dispatch();service.dispatch();
         assertEquals(1,sent.size());assertEquals("UNCERTAIN",service.settings().attempts().get(0).status());
     }
     @Test void disabledSenderMakesNoCallsAndCannotClaimJobs() {
@@ -59,5 +60,10 @@ class EmailRemindersTest {
         assertEquals("eilif@example.com",service.settings().contacts().stream().filter(c->c.username().equals("eilif")).findFirst().orElseThrow().email());
         service.contact("eilif","");
         assertEquals("",service.settings().contacts().stream().filter(c->c.username().equals("eilif")).findFirst().orElseThrow().email());
+    }
+    @Test void unverifiedAddressesNeverReceiveReminders() {
+        var clock=at("2026-09-13T12:00:00Z");var service=reminders(clock,false);
+        house(clock).weeks();service.contact("eilif","eilif@example.com");
+        service.dispatch();assertTrue(sent.isEmpty());assertTrue(service.settings().attempts().isEmpty());
     }
 }

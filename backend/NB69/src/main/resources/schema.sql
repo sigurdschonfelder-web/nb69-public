@@ -39,3 +39,11 @@ CREATE TABLE IF NOT EXISTS nb69_email_reminders (
 
 -- Version the default rota without rewriting past weeks or admin overrides.
 ALTER TABLE nb69_assignments ADD COLUMN IF NOT EXISTS rotation_version INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE nb69_email_contacts ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE nb69_email_contacts ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64);
+ALTER TABLE nb69_email_contacts ADD COLUMN IF NOT EXISTS token_expires TIMESTAMP WITH TIME ZONE;
+CREATE TABLE IF NOT EXISTS nb69_email_verification_limits (
+ username VARCHAR(32) PRIMARY KEY REFERENCES nb69_users(username),
+ last_sent TIMESTAMP WITH TIME ZONE NOT NULL
+);

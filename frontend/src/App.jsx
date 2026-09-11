@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Circle, CircleCheck, Recycle, LogOut, Settings, ArrowLeft, House, TriangleAlert, Bell } from 'lucide-react';
 import './index.css';
+import EmailProfileForm from './EmailProfileForm';
 
 let csrf;
 async function request(path, options = {}) {
@@ -64,24 +65,15 @@ function Login({ onLogin }) {
 function EmailSettings() {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
   useEffect(() => { request('/admin/email').then(setSettings).catch(err => setError(err.message)); }, []);
-  async function save(event, username) {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    const email = new FormData(event.currentTarget).get('email');
-    try {
-      await request(`/admin/email/${username}`, json('PUT', { email }));
-      setSettings(await request('/admin/email')); setNotice('E-postadressen er lagret.');
-    } catch (err) { setError(err.message); } finally { setBusy(false); }
-  }
   const statuses = { ACCEPTED:'Mottatt av e-posttjenesten', CLAIMED:'Uavklart – sjekk e-posttjenesten', UNCERTAIN:'Feil eller uavklart – sjekk e-posttjenesten', SKIPPED:'Utelatt' };
   return <section className="panel email-section"><h2>E-postpåminnelser</h2>
     <p className="muted">Søndag kl. 14 og mandag kl. 08, norsk tid. Bare oppgaver som fortsatt ikke er bekreftet utløser e-post.</p>
-    {error && <p role="alert" className="error">{error}</p>}{notice && <p role="status" className="success">{notice}</p>}
+    {error && <p role="alert" className="error">{error}</p>}
     {!settings && !error && <p role="status">Henter e-postoppsett…</p>}
-    {settings && <><p className={settings.ready ? 'success' : 'notice'}>{settings.ready ? 'E-postutsending er aktivert.' : 'E-postutsending er ikke aktivert. E-postadressene kan legges inn nå; ingen meldinger sendes før tjenesten er koblet til.'}</p>
-    {settings.contacts.map(contact => <form className="email-contact" key={contact.username} onSubmit={event => save(event,contact.username)}><label>{contact.name}<input type="email" name="email" autoComplete="off" defaultValue={contact.email} placeholder="navn@eksempel.no" aria-label={`E-postadresse til ${contact.name}`} /></label><button className="secondary" disabled={busy}>Lagre e-postadresse</button></form>)}
+    {settings && <><p className={settings.ready ? 'success' : 'notice'}>{settings.ready ? 'E-postutsending er aktivert.' : 'E-postutsending er ikke aktivert. E-postadressene kan registreres i Min profil nå; ingen meldinger sendes før tjenesten er koblet til.'}</p>
+    <p className="muted">Hver beboer legger inn og bekrefter sin egen adresse i Min profil.</p>
+    {settings.contacts.map(contact => <div className="email-contact" key={contact.username}><strong>{contact.name}</strong><span>{contact.email || 'Ingen adresse registrert'}</span><small>{contact.verified ? 'Bekreftet' : contact.email ? 'Venter på bekreftelse' : 'Ikke registrert'}</small></div>)}
     {settings.attempts.length > 0 && <><h3>Siste påminnelser</h3>{settings.attempts.map(attempt => <div className="email-log" key={`${attempt.start}-${attempt.taskId}-${attempt.kind}`}><strong>{attempt.name} · {attempt.kind === 'SUNDAY' ? 'Søndagspåminnelse' : 'Mandagspurring'}</strong><small>{statuses[attempt.status]} · {when(attempt.attemptedAt)}</small></div>)}<p className="muted">Mottatt av e-posttjenesten betyr ikke at e-posten er levert til innboksen. Uavklarte forsøk sendes ikke automatisk på nytt.</p></>}
     </>}
   </section>;
@@ -115,6 +107,18 @@ export default function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('confirm-email'));
+  const [emailVerified, setEmailVerified] = useState(true);
+  useEffect(() => {
+    const readLink=() => {
+      const token=new URLSearchParams(window.location.hash.slice(1)).get('confirm-email');
+      if(token) {setConfirmation(token);setProfileOpen(true);window.history.replaceState(null,'',window.location.pathname+window.location.search);}
+    };
+    readLink();window.addEventListener('hashchange',readLink);
+    return () => window.removeEventListener('hashchange',readLink);
+  }, []);
+  useEffect(() => {if(user) request('/profile/email').then(profile=>setEmailVerified(profile.verified)).catch(()=>{});}, [user, profileOpen]);
   async function refresh() { const data = await request('/dashboard'); setWeeks(data.weeks); setOverdue(data.overdue); }
   useEffect(() => {
     function expired() { setUser(null); setWeeks([]); setOverdue([]); setAdmin(false); csrf = null; }
@@ -139,9 +143,10 @@ export default function App() {
   }
   return <div className="app-shell"><header className="app-header"><a href="/" className="brand" aria-label="NB69 hjem">NB<span>69</span><em>.</em></a>{user && <div className="account"><div>{user.name}<small>{user.admin ? 'Administrator' : 'Beboer'}</small></div><span className="avatar" aria-hidden="true">{user.name[0]}</span></div>}</header>
     {loading ? <main><p role="status">Laster…</p></main> : !user ? <><Login onLogin={value => {setUser(value); setError('');}}/>{error && <p role="alert" className="error">{error}</p>}</> : <>
-      <nav className="toolbar">{user.admin && <button className="text-button" onClick={() => setAdmin(!admin)}>{admin ? <ArrowLeft size={17}/> : <Settings size={17}/>} {admin ? 'Tilbake til oppgavene' : 'Administrasjon'}</button>}<button className="text-button logout" onClick={async () => {try {await request('/logout', {method:'POST'}); csrf=null; setUser(null); setWeeks([]); setOverdue([]); setAdmin(false);} catch(err) {setError(err.message);}}}><LogOut size={16}/> Logg ut</button></nav>
+      <nav className="toolbar"><button className="text-button" onClick={() => {setProfileOpen(!profileOpen);setAdmin(false);setConfirmation(null);}}>{profileOpen ? 'Tilbake til oppgavene' : 'Min profil'}</button>{user.admin && <button className="text-button" onClick={() => {setAdmin(!admin);setProfileOpen(false);}}>{admin ? <ArrowLeft size={17}/> : <Settings size={17}/>} {admin ? 'Tilbake til oppgavene' : 'Administrasjon'}</button>}<button className="text-button logout" onClick={async () => {try {await request('/logout', {method:'POST'}); csrf=null; setUser(null); setWeeks([]); setOverdue([]); setAdmin(false);} catch(err) {setError(err.message);}}}><LogOut size={16}/> Logg ut</button></nav>
       <main>{error && <div className="error" role="alert">{error}<button className="text-button" onClick={() => refresh().then(() => setError('')).catch(err => setError(err.message))}>Prøv igjen</button></div>}
-      {admin ? <Admin weeks={weeks} refresh={refresh}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
+      {profileOpen || confirmation ? <EmailProfileForm request={request} confirmation={confirmation} onConfirmed={() => {setConfirmation(null);setEmailVerified(true);}}/> : admin ? <Admin weeks={weeks} refresh={refresh}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
+      {!emailVerified && <div className="notice"><strong>Legg inn og bekreft e-postadressen din</strong><p>Da kan du få påminnelser om oppgavene dine.</p><button className="text-button" onClick={() => setProfileOpen(true)}>Åpne Min profil</button></div>}
       {!current && !error && <p role="status">Henter ukens oppgaver…</p>}
       {overdue.length > 0 && <section className="overdue-alert" aria-label="Oppgaver som har passert fristen"><div className="alert-heading"><TriangleAlert size={24}/><h2>Du har {overdue.length === 1 ? 'en oppgave' : `${overdue.length} oppgaver`} som haster</h2></div><p>Fristen er passert. Gjør ferdig oppgavene så snart som mulig og bekreft her.</p>{overdue.map(task => <article className="overdue-task" key={`${task.start}-${task.id}`}><h3>{task.task}</h3><p>Uke {task.week} · frist {when(new Date(new Date(task.dueAt).getTime()-1))}</p><button className="primary" disabled={busy} onClick={() => complete(task,task.start)}><Check size={20}/>{busy ? 'Lagrer…' : 'Bekreft utført'}</button></article>)}</section>}
       {current?.reminderDue && own.some(task => !task.completedAt) && <div className="deadline-reminder" role="status"><Bell size={21}/><div><strong>Husk oppgaven din i dag</strong><p>Ukens ansvar må være fullført før søndag er over.</p></div></div>}
