@@ -151,6 +151,15 @@ public class HouseService {
         audit(actor, "ASSIGN", start + "/" + task + " -> " + username);
     }
     @Transactional
+    public void undoOwn(LocalDate start, int task, String actor) {
+        if (start.isAfter(currentStart())) throw new ResponseStatusException(CONFLICT, "Du kan ikke angre oppgaver for en fremtidig uke.");
+        var owners = jdbc.query("select username from nb69_assignments where week_start=? and task_id=? for update", (rs,i) -> rs.getString(1), start, task);
+        if (owners.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "Oppgaven finnes ikke.");
+        if (!owners.get(0).equals(actor)) throw new ResponseStatusException(FORBIDDEN, "Du kan bare angre dine egne registreringer.");
+        int changed = jdbc.update("update nb69_assignments set completed_at=null, completed_by=null, completion_comment=null where week_start=? and task_id=? and completed_at is not null", start, task);
+        if (changed > 0) audit(actor, "UNDO", start + "/" + task);
+    }
+    @Transactional
     public void undo(LocalDate start, int task, String actor) {
         editable(start);
         int changed = jdbc.update("update nb69_assignments set completed_at=null, completed_by=null, completion_comment=null where week_start=? and task_id=?", start, task);

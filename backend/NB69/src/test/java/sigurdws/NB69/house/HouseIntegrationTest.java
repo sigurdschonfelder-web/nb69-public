@@ -228,4 +228,25 @@ class HouseIntegrationTest {
         assertTrue(at("2027-04-05T12:00:00Z").history().isEmpty());
     }
 
+    @Test void residentCanUndoOwnLateCompletionButNotOthersAndMustUseCsrf() throws Exception {
+        var start=house.currentStart().minusWeeks(1);
+        jdbc.update("insert into nb69_assignments (week_start,task_id,task_name,username) values (?,0,'Kjøkken','andreas')",start);
+        house.complete(start,0,"andreas","Ferdig");
+        String route="/api/weeks/"+start+"/tasks/0/completion";
+        mvc.perform(delete(route)).andExpect(status().isForbidden());
+        mvc.perform(delete(route).with(user("andreas"))).andExpect(status().isForbidden());
+        mvc.perform(delete(route).with(user("sigurd")).with(csrf())).andExpect(status().isForbidden());
+        assertNotNull(house.history().get(0).assignments().get(0).completedAt());
+        mvc.perform(delete(route).with(user("andreas")).with(csrf())).andExpect(status().isNoContent());
+        assertNull(house.history().get(0).assignments().get(0).completedAt());
+        assertNull(house.history().get(0).assignments().get(0).comment());
+        assertTrue(house.dashboard("andreas").overdue().stream().anyMatch(task -> task.start().equals(start)));
+        mvc.perform(delete(route).with(user("andreas")).with(csrf())).andExpect(status().isNoContent());
+        assertEquals(1,jdbc.queryForObject("select count(*) from nb69_audit where action='UNDO'",Integer.class));
+        mvc.perform(delete("/api/weeks/"+start.minusWeeks(1)+"/tasks/0/completion").with(user("andreas")).with(csrf())).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/weeks/"+house.currentStart().plusWeeks(1)+"/tasks/0/completion").with(user("andreas")).with(csrf())).andExpect(status().isConflict());
+        house.complete(start,0,"andreas","Rettet");
+        assertTrue(house.dashboard("andreas").overdue().stream().noneMatch(task -> task.start().equals(start)));
+    }
+
 }

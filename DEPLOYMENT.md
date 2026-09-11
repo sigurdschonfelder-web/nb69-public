@@ -106,3 +106,5 @@ Resend-dokumentasjon: [domener](https://resend.com/docs/dashboard/domains/introd
 Oppgavene har forslag til sjekklister i grensesnittet. Avkrysninger er midlertidige huskelister og lagres ikke; «Bekreft utført» registrerer fullføringen. Den ansvarlige kan legge ved en valgfri kommentar på opptil 500 tegn, synlig for innloggede beboere. Kommentaren lagres sammen med tidspunktet, også ved sen fullføring. Gjentatt bekreftelse overskriver ikke kommentaren. Når admin angrer registreringen, fjernes både fullføring og kommentar.
 
 Historikken viser eksisterende oppgaver for inneværende uke og de elleve foregående ukene, inkludert oppgaver som fortsatt gjenstår. Tidligere data beholdes i databasen. Ingen eldre uker opprettes ved lesing av historikk. Databaseskjemaet oppgraderes automatisk med `completion_comment` ved backend-oppstart.
+
+Beboere kan angre egne fullføringer fra oppgavekortet eller historikken. Dette fjerner også kommentaren. En tidligere oppgave blir igjen synlig som forsinket hvis fristen er passert. Andre beboeres registreringer kan bare endres via administrasjon.

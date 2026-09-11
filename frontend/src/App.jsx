@@ -139,6 +139,12 @@ export default function App() {
   const current = weeks[0];
   const own = current?.assignments.filter(task => task.username === user?.username) || [];
   const count = current?.assignments.filter(task => task.completedAt).length || 0;
+  async function undoOwn(task, start) {
+    if (!window.confirm(`Angre registreringen av ${task.task}? Oppgaven blir stående som ikke utført, og kommentaren fjernes.`)) return;
+    setBusy(true); setError('');
+    try {await request(`/weeks/${start}/tasks/${task.id}/completion`, {method:'DELETE'}); await refresh();}
+    catch (err) {setError(err.message);} finally {setBusy(false);}
+  }
   async function complete(task, start = current.start, comment = '') {
     setBusy(true); setError('');
     try {await request(`/weeks/${start}/tasks/${task.id}/completion`, json('POST', {comment})); await refresh(); return true;}
@@ -154,11 +160,11 @@ export default function App() {
       {overdue.length > 0 && <section className="overdue-alert" aria-label="Oppgaver som har passert fristen"><div className="alert-heading"><TriangleAlert size={24}/><h2>Du har {overdue.length === 1 ? 'en oppgave' : `${overdue.length} oppgaver`} som haster</h2></div><p>Fristen er passert. Gjør ferdig oppgavene så snart som mulig og bekreft her.</p>{overdue.map(task => <article className="overdue-task" key={`${task.start}-${task.id}`}><h3>{task.task}</h3><p>Uke {task.week} · frist {when(new Date(new Date(task.dueAt).getTime()-1))}</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,task.start,comment)}/></article>)}</section>}
       {current?.reminderDue && own.some(task => !task.completedAt) && <div className="deadline-reminder" role="status"><Bell size={21}/><div><strong>Husk oppgaven din i dag</strong><p>Ukens ansvar må være fullført før søndag er over.</p></div></div>}
       <div className="dashboard"><section className="my-tasks" aria-label="Dine ansvarsområder">
-      {own.map(task => <article className="panel own-task" key={`${current.start}-${task.id}`}><div className="task-top"><span className="task-icon"><Recycle size={23}/></span><span>Ditt ansvar denne uka</span></div><h2>{task.task}</h2><p className="muted">Frist: søndag {when(new Date(new Date(current.dueAt).getTime()-1))}. Bekreft når du er ferdig.</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,current.start,comment)}/>{task.completedAt && <p className="receipt" role="status">Bekreftet {when(task.completedAt)}</p>}</article>)}
+      {own.map(task => <article className="panel own-task" key={`${current.start}-${task.id}`}><div className="task-top"><span className="task-icon"><Recycle size={23}/></span><span>Ditt ansvar denne uka</span></div><h2>{task.task}</h2><p className="muted">Frist: søndag {when(new Date(new Date(current.dueAt).getTime()-1))}. Bekreft når du er ferdig.</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,current.start,comment)} onUndo={() => undoOwn(task,current.start)}/>{task.completedAt && <p className="receipt" role="status">Bekreftet {when(task.completedAt)}</p>}</article>)}
       {current && own.length === 0 && <div className="panel"><h2>Ingen oppgaver denne uka</h2><p className="muted">Du har ikke fått tildelt et ansvarsområde.</p></div>}
       </section>{current && <section className="household"><div className="section-heading"><h2>Hele leiligheten</h2><span aria-live="polite">{count} av {current.assignments.length} utført</span></div><progress aria-label="Utførte oppgaver" value={count} max={current.assignments.length || 1}/><ul className="task-list">{current.assignments.map(task => <li key={task.id}><div><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/><small>{task.person}{task.username === user.username ? ' · deg' : ''}</small></div>{task.completedAt && <small>{when(task.completedAt)}</small>}{task.comment && <p className="task-comment">{task.comment}</p>}</div><span className={`status ${task.completedAt ? 'done' : ''}`}>{task.completedAt ? <CircleCheck size={17}/> : <Circle size={17}/>} {task.completedAt ? 'Utført' : 'Gjenstår'}</span></li>)}</ul></section>}</div>
       {weeks[1] && <details className="next-week"><summary>Neste uke <span>Uke {weeks[1].week}</span></summary><ul className="task-list">{weeks[1].assignments.map(task => <li key={task.id}><strong>{task.task}</strong><span>{task.person}</span></li>)}</ul></details>}
-      <TaskHistory request={request} revision={weeks}/>
+      <TaskHistory request={request} revision={weeks} username={user.username} busy={busy} onUndo={undoOwn}/>
       </>}
       </main></>}
       <footer>Nedre Bakklandet 69</footer>

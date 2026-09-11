@@ -30,6 +30,8 @@ public class HouseController {
     @GetMapping("/weeks") public List<HouseService.Week> weeks() { return house.weeks(); }
     @PostMapping("/weeks/{start}/tasks/{id}/completion") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void complete(@PathVariable LocalDate start, @PathVariable int id, Principal principal, @RequestBody(required=false) Completion body) { house.complete(start,id,principal.getName(),body == null ? null : body.comment()); }
+    @DeleteMapping("/weeks/{start}/tasks/{id}/completion") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void undoOwn(@PathVariable LocalDate start, @PathVariable int id, Principal principal) { house.undoOwn(start,id,principal.getName()); }
     @GetMapping("/admin/users") public List<HouseService.Resident> users() { return house.users(); }
     @PostMapping("/admin/users/{username}/invite")
     public Map<String,String> invite(@PathVariable String username, Principal principal) { return Map.of("code",house.invite(username, principal.getName())); }
