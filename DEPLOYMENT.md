@@ -108,3 +108,11 @@ Oppgavene har forslag til sjekklister i grensesnittet. Avkrysninger er midlertid
 Historikken viser eksisterende oppgaver for inneværende uke og de elleve foregående ukene, inkludert oppgaver som fortsatt gjenstår. Tidligere data beholdes i databasen. Ingen eldre uker opprettes ved lesing av historikk. Databaseskjemaet oppgraderes automatisk med `completion_comment` ved backend-oppstart.
 
 Beboere kan angre egne fullføringer fra oppgavekortet eller historikken. Dette fjerner også kommentaren. En tidligere oppgave blir igjen synlig som forsinket hvis fristen er passert. Andre beboeres registreringer kan bare endres via administrasjon.
+
+### Bytte mellom uker og felles handleliste
+
+«Felles i leiligheten» inneholder inngangen «Borte denne uka / bytt oppgave». Beboeren velger sin ufullførte oppgave og en annen beboers oppgave i en senere uke, innenfor inneværende uke og sju uker framover. Dette registrerer en bytteforespørsel, ikke et automatisk fritak eller en separat fraværskalender. Bare mottakeren kan godta eller avslå; avsender kan trekke tilbake. Ingen e-post eller SMS sendes for bytter. Forespørsler vises på siden og hentes på nytt med ukeoversikten omtrent hvert minutt.
+
+Ved godkjenning låses og kontrolleres begge oppgavene på nytt, og eierne endres i samme databasetransaksjon. Utførte, omfordelte eller utløpte oppgaver kan ikke byttes. Overlappende åpne forespørsler avvises. Et gjennomført bytte endrer ikke den faste rotasjonen. Planleggingsvisningen lagrer sammenhengende ukefordelinger åtte uker framover.
+
+Alle innloggede beboere kan legge inn varer og markere dem som kjøpt. Navnet på den som la til og kjøpte varen lagres. Avkrysning kan angres under «Kjøpte varer». Listen viser opptil 200 varer med alle åpne først, og tillater maksimalt 100 åpne varer. Navn kan ha opptil 120 tegn. Data lagres i de nye tabellene `nb69_swaps` og `nb69_shopping`, som opprettes automatisk ved oppstart.

@@ -99,6 +99,13 @@ public class HouseService {
         if (last != null) for (var missing=last.plusWeeks(1); missing.isBefore(start); missing=missing.plusWeeks(1)) ensureWeek(missing);
         return List.of(week(start, "Denne uka"), week(start.plusWeeks(1), "Neste uke"));
     }
+    @Transactional
+    public List<Week> plannedWeeks() {
+        weeks();
+        var result = new ArrayList<Week>();
+        for(int i=0;i<8;i++) result.add(week(currentStart().plusWeeks(i), "Uke"));
+        return result;
+    }
     private void ensureWeek(LocalDate start) {
         boolean newRotation = !start.isBefore(ROTATION_START);
         for (int i=0;i<TASKS.size();i++) {

@@ -5,6 +5,7 @@ import EmailProfileForm from './EmailProfileForm';
 import Avatar from './Avatar';
 import TaskDetails from './TaskDetails';
 import TaskHistory from './TaskHistory';
+import SharedHouse from './SharedHouse';
 
 let csrf;
 async function request(path, options = {}) {
@@ -164,6 +165,7 @@ export default function App() {
       {current && own.length === 0 && <div className="panel"><h2>Ingen oppgaver denne uka</h2><p className="muted">Du har ikke fått tildelt et ansvarsområde.</p></div>}
       </section>{current && <section className="household"><div className="section-heading"><h2>Hele leiligheten</h2><span aria-live="polite">{count} av {current.assignments.length} utført</span></div><progress aria-label="Utførte oppgaver" value={count} max={current.assignments.length || 1}/><ul className="task-list">{current.assignments.map(task => <li key={task.id}><div><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/><small>{task.person}{task.username === user.username ? ' · deg' : ''}</small></div>{task.completedAt && <small>{when(task.completedAt)}</small>}{task.comment && <p className="task-comment">{task.comment}</p>}</div><span className={`status ${task.completedAt ? 'done' : ''}`}>{task.completedAt ? <CircleCheck size={17}/> : <Circle size={17}/>} {task.completedAt ? 'Utført' : 'Gjenstår'}</span></li>)}</ul></section>}</div>
       {weeks[1] && <details className="next-week"><summary>Neste uke <span>Uke {weeks[1].week}</span></summary><ul className="task-list">{weeks[1].assignments.map(task => <li key={task.id}><strong>{task.task}</strong><span>{task.person}</span></li>)}</ul></details>}
+      <SharedHouse user={user} request={request} refresh={refresh} revision={weeks}/>
       <TaskHistory request={request} revision={weeks} username={user.username} busy={busy} onUndo={undoOwn}/>
       </>}
       </main></>}
