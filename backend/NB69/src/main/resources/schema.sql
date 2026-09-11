@@ -53,3 +53,5 @@ CREATE TABLE IF NOT EXISTS nb69_avatars (
  image_base64 VARCHAR(300000) NOT NULL,
  version VARCHAR(36) NOT NULL
 );
+
+ALTER TABLE nb69_assignments ADD COLUMN IF NOT EXISTS completion_comment VARCHAR(500);

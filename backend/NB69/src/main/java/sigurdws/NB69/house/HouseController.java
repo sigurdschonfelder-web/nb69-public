@@ -15,6 +15,8 @@ public class HouseController {
     public HouseController(HouseService house, org.springframework.security.core.session.SessionRegistry sessions) { this.house=house; this.sessions=sessions; }
     record Activation(String username, String code, String password) {}
     record Assignment(String username) {}
+    record Completion(String comment) {}
+    @GetMapping("/history") public List<HouseService.Week> history() { return house.history(); }
     @GetMapping("/csrf") public Map<String,String> csrf(CsrfToken token) { return Map.of("headerName", token.getHeaderName(), "token", token.getToken()); }
     @GetMapping("/me") public HouseService.Resident me(Principal principal) { return house.user(principal.getName()); }
     @PostMapping("/activate") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
@@ -27,7 +29,7 @@ public class HouseController {
     @GetMapping("/dashboard") public HouseService.Dashboard dashboard(Principal principal) { return house.dashboard(principal.getName()); }
     @GetMapping("/weeks") public List<HouseService.Week> weeks() { return house.weeks(); }
     @PostMapping("/weeks/{start}/tasks/{id}/completion") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
-    public void complete(@PathVariable LocalDate start, @PathVariable int id, Principal principal) { house.complete(start,id,principal.getName()); }
+    public void complete(@PathVariable LocalDate start, @PathVariable int id, Principal principal, @RequestBody(required=false) Completion body) { house.complete(start,id,principal.getName(),body == null ? null : body.comment()); }
     @GetMapping("/admin/users") public List<HouseService.Resident> users() { return house.users(); }
     @PostMapping("/admin/users/{username}/invite")
     public Map<String,String> invite(@PathVariable String username, Principal principal) { return Map.of("code",house.invite(username, principal.getName())); }

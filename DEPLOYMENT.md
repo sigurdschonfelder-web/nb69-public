@@ -100,3 +100,9 @@ Resend-dokumentasjon: [domener](https://resend.com/docs/dashboard/domains/introd
 - Nettleseren tar JPG, PNG og WebP (maks 12 MB), bruker midten av bildet og lager en JPEG på 256 × 256 piksler før opplasting. HEIC må konverteres til JPG først.
 - Serveren kontrollerer faktisk bildeinnhold, filstørrelse og oppløsning og lager selv en ny 256 × 256 JPEG uten original metadata. SVG eller vilkårlige filer godtas ikke.
 - Bilder lagres i `nb69_avatars` i eksisterende database og overlever serveromstart. Tabellen opprettes automatisk av `schema.sql`; ingen ny lagringstjeneste trengs. Bilder kan bare hentes av innloggede beboere og kan bare endres av eieren. Ingen profilbilder er lagt i Git.
+
+### Sjekklister, kommentarer og historikk
+
+Oppgavene har forslag til sjekklister i grensesnittet. Avkrysninger er midlertidige huskelister og lagres ikke; «Bekreft utført» registrerer fullføringen. Den ansvarlige kan legge ved en valgfri kommentar på opptil 500 tegn, synlig for innloggede beboere. Kommentaren lagres sammen med tidspunktet, også ved sen fullføring. Gjentatt bekreftelse overskriver ikke kommentaren. Når admin angrer registreringen, fjernes både fullføring og kommentar.
+
+Historikken viser eksisterende oppgaver for inneværende uke og de elleve foregående ukene, inkludert oppgaver som fortsatt gjenstår. Tidligere data beholdes i databasen. Ingen eldre uker opprettes ved lesing av historikk. Databaseskjemaet oppgraderes automatisk med `completion_comment` ved backend-oppstart.

@@ -35,7 +35,7 @@ public class HouseService {
         this.jdbc=jdbc; this.encoder=encoder; this.clock=clock;
     }
     public record Resident(String username, String name, boolean admin, boolean active, String avatarVersion) {}
-    public record Task(int id, String task, String username, String person, Instant completedAt, boolean late, String avatarVersion) {}
+    public record Task(int id, String task, String username, String person, Instant completedAt, boolean late, String avatarVersion, String comment) {}
     public record Week(LocalDate start, int week, String label, Instant dueAt, boolean reminderDue, List<Task> assignments) {}
     public record Overdue(LocalDate start, int week, int id, String task, Instant dueAt) {}
     public record Dashboard(List<Week> weeks, List<Overdue> overdue) {}
@@ -113,10 +113,17 @@ public class HouseService {
 
     private Week week(LocalDate start, String label) {
         ensureWeek(start);
+        return readWeek(start, label);
+    }
+    public List<Week> history() {
+        return jdbc.query("select distinct week_start from nb69_assignments where week_start<=? and week_start>=? order by week_start desc", (rs,i) -> rs.getObject(1, LocalDate.class), currentStart(), currentStart().minusWeeks(11))
+            .stream().map(start -> readWeek(start, "Uke " + start.get(WeekFields.ISO.weekOfWeekBasedYear()))).toList();
+    }
+    private Week readWeek(LocalDate start, String label) {
         int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());
         var tasks = jdbc.query("select a.*, u.display_name, p.version as avatar_version from nb69_assignments a join nb69_users u on u.username=a.username left join nb69_avatars p on p.username=a.username where week_start=? order by task_id", (rs,i) -> {
             var completed = rs.getObject("completed_at", OffsetDateTime.class);
-            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant(), completed != null && !completed.toInstant().isBefore(deadline(start)), rs.getString("avatar_version"));
+            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant(), completed != null && !completed.toInstant().isBefore(deadline(start)), rs.getString("avatar_version"), rs.getString("completion_comment"));
         }, start);
         return new Week(start, week, label, deadline(start), !clock.instant().isBefore(sundayReminder(start)) && clock.instant().isBefore(deadline(start)), tasks);
     }
@@ -124,12 +131,16 @@ public class HouseService {
         if (!start.equals(currentStart()) && !start.equals(currentStart().plusWeeks(1))) throw new ResponseStatusException(CONFLICT, "Bare denne og neste uke kan endres. Oppdater siden.");
     }
     @Transactional
-    public void complete(LocalDate start, int task, String actor) {
+    public void complete(LocalDate start, int task, String actor) { complete(start, task, actor, null); }
+    @Transactional
+    public void complete(LocalDate start, int task, String actor, String comment) {
+        if (comment != null && comment.length() > 500) throw new ResponseStatusException(BAD_REQUEST, "Kommentaren kan ha maksimalt 500 tegn.");
+        comment = comment == null || comment.isBlank() ? null : comment.strip();
         if (start.isAfter(currentStart())) throw new ResponseStatusException(CONFLICT, "Du kan ikke bekrefte oppgaver for en fremtidig uke.");
         var owners = jdbc.query("select username from nb69_assignments where week_start=? and task_id=? for update", (rs,i) -> rs.getString(1), start, task);
         if (owners.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "Oppgaven finnes ikke.");
         if (!owners.get(0).equals(actor)) throw new ResponseStatusException(FORBIDDEN, "Du kan bare bekrefte dine egne oppgaver.");
-        int changed = jdbc.update("update nb69_assignments set completed_at=?, completed_by=? where week_start=? and task_id=? and completed_at is null", OffsetDateTime.now(clock), actor, start, task);
+        int changed = jdbc.update("update nb69_assignments set completed_at=?, completed_by=?, completion_comment=? where week_start=? and task_id=? and completed_at is null", OffsetDateTime.now(clock), actor, comment, start, task);
         if (changed > 0) audit(actor, "COMPLETE", start + "/" + task);
     }
     @Transactional
@@ -142,7 +153,7 @@ public class HouseService {
     @Transactional
     public void undo(LocalDate start, int task, String actor) {
         editable(start);
-        int changed = jdbc.update("update nb69_assignments set completed_at=null, completed_by=null where week_start=? and task_id=?", start, task);
+        int changed = jdbc.update("update nb69_assignments set completed_at=null, completed_by=null, completion_comment=null where week_start=? and task_id=?", start, task);
         if (changed == 0) throw new ResponseStatusException(NOT_FOUND, "Oppgaven finnes ikke.");
         audit(actor, "UNDO", start + "/" + task);
     }

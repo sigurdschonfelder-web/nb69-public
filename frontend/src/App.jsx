@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Check, Circle, CircleCheck, Recycle, LogOut, Settings, ArrowLeft, House, TriangleAlert, Bell } from 'lucide-react';
+import { Circle, CircleCheck, Recycle, LogOut, Settings, ArrowLeft, House, TriangleAlert, Bell } from 'lucide-react';
 import './index.css';
 import EmailProfileForm from './EmailProfileForm';
 import Avatar from './Avatar';
+import TaskDetails from './TaskDetails';
+import TaskHistory from './TaskHistory';
 
 let csrf;
 async function request(path, options = {}) {
@@ -137,10 +139,10 @@ export default function App() {
   const current = weeks[0];
   const own = current?.assignments.filter(task => task.username === user?.username) || [];
   const count = current?.assignments.filter(task => task.completedAt).length || 0;
-  async function complete(task, start = current.start) {
+  async function complete(task, start = current.start, comment = '') {
     setBusy(true); setError('');
-    try {await request(`/weeks/${start}/tasks/${task.id}/completion`, {method:'POST'}); await refresh();}
-    catch (err) {setError(err.message);} finally {setBusy(false);}
+    try {await request(`/weeks/${start}/tasks/${task.id}/completion`, json('POST', {comment})); await refresh(); return true;}
+    catch (err) {setError(err.message); return false;} finally {setBusy(false);}
   }
   return <div className="app-shell"><header className="app-header"><a href="/" className="brand" aria-label="NB69 hjem">NB<span>69</span><em>.</em></a>{user && <div className="account"><div>{user.name}<small>{user.admin ? 'Administrator' : 'Beboer'}</small></div><Avatar username={user.username} name={user.name} version={user.avatarVersion}/></div>}</header>
     {loading ? <main><p role="status">Laster…</p></main> : !user ? <><Login onLogin={value => {setUser(value); setError('');}}/>{error && <p role="alert" className="error">{error}</p>}</> : <>
@@ -149,13 +151,14 @@ export default function App() {
       {profileOpen || confirmation ? <EmailProfileForm user={user} onPhotoChanged={async () => {setUser(await request('/me'));await refresh();}} request={request} confirmation={confirmation} onConfirmed={() => {setConfirmation(null);setEmailVerified(true);}}/> : admin ? <Admin weeks={weeks} refresh={refresh}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
       {!emailVerified && <div className="notice"><strong>Legg inn og bekreft e-postadressen din</strong><p>Da kan du få påminnelser om oppgavene dine.</p><button className="text-button" onClick={() => setProfileOpen(true)}>Åpne Min profil</button></div>}
       {!current && !error && <p role="status">Henter ukens oppgaver…</p>}
-      {overdue.length > 0 && <section className="overdue-alert" aria-label="Oppgaver som har passert fristen"><div className="alert-heading"><TriangleAlert size={24}/><h2>Du har {overdue.length === 1 ? 'en oppgave' : `${overdue.length} oppgaver`} som haster</h2></div><p>Fristen er passert. Gjør ferdig oppgavene så snart som mulig og bekreft her.</p>{overdue.map(task => <article className="overdue-task" key={`${task.start}-${task.id}`}><h3>{task.task}</h3><p>Uke {task.week} · frist {when(new Date(new Date(task.dueAt).getTime()-1))}</p><button className="primary" disabled={busy} onClick={() => complete(task,task.start)}><Check size={20}/>{busy ? 'Lagrer…' : 'Bekreft utført'}</button></article>)}</section>}
+      {overdue.length > 0 && <section className="overdue-alert" aria-label="Oppgaver som har passert fristen"><div className="alert-heading"><TriangleAlert size={24}/><h2>Du har {overdue.length === 1 ? 'en oppgave' : `${overdue.length} oppgaver`} som haster</h2></div><p>Fristen er passert. Gjør ferdig oppgavene så snart som mulig og bekreft her.</p>{overdue.map(task => <article className="overdue-task" key={`${task.start}-${task.id}`}><h3>{task.task}</h3><p>Uke {task.week} · frist {when(new Date(new Date(task.dueAt).getTime()-1))}</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,task.start,comment)}/></article>)}</section>}
       {current?.reminderDue && own.some(task => !task.completedAt) && <div className="deadline-reminder" role="status"><Bell size={21}/><div><strong>Husk oppgaven din i dag</strong><p>Ukens ansvar må være fullført før søndag er over.</p></div></div>}
       <div className="dashboard"><section className="my-tasks" aria-label="Dine ansvarsområder">
-      {own.map(task => <article className="panel own-task" key={`${current.start}-${task.id}`}><div className="task-top"><span className="task-icon"><Recycle size={23}/></span><span>Ditt ansvar denne uka</span></div><h2>{task.task}</h2><p className="muted">Frist: søndag {when(new Date(new Date(current.dueAt).getTime()-1))}. Bekreft når du er ferdig.</p><button className={`primary ${task.completedAt ? 'completed' : ''}`} disabled={busy || !!task.completedAt} onClick={() => complete(task)}><Check size={20}/>{task.completedAt ? 'Utført' : busy ? 'Lagrer…' : 'Bekreft utført'}</button>{task.completedAt && <p className="receipt" role="status">Bekreftet {when(task.completedAt)}</p>}</article>)}
+      {own.map(task => <article className="panel own-task" key={`${current.start}-${task.id}`}><div className="task-top"><span className="task-icon"><Recycle size={23}/></span><span>Ditt ansvar denne uka</span></div><h2>{task.task}</h2><p className="muted">Frist: søndag {when(new Date(new Date(current.dueAt).getTime()-1))}. Bekreft når du er ferdig.</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,current.start,comment)}/>{task.completedAt && <p className="receipt" role="status">Bekreftet {when(task.completedAt)}</p>}</article>)}
       {current && own.length === 0 && <div className="panel"><h2>Ingen oppgaver denne uka</h2><p className="muted">Du har ikke fått tildelt et ansvarsområde.</p></div>}
-      </section>{current && <section className="household"><div className="section-heading"><h2>Hele leiligheten</h2><span aria-live="polite">{count} av {current.assignments.length} utført</span></div><progress aria-label="Utførte oppgaver" value={count} max={current.assignments.length || 1}/><ul className="task-list">{current.assignments.map(task => <li key={task.id}><div><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/><small>{task.person}{task.username === user.username ? ' · deg' : ''}</small></div>{task.completedAt && <small>{when(task.completedAt)}</small>}</div><span className={`status ${task.completedAt ? 'done' : ''}`}>{task.completedAt ? <CircleCheck size={17}/> : <Circle size={17}/>} {task.completedAt ? 'Utført' : 'Gjenstår'}</span></li>)}</ul></section>}</div>
+      </section>{current && <section className="household"><div className="section-heading"><h2>Hele leiligheten</h2><span aria-live="polite">{count} av {current.assignments.length} utført</span></div><progress aria-label="Utførte oppgaver" value={count} max={current.assignments.length || 1}/><ul className="task-list">{current.assignments.map(task => <li key={task.id}><div><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/><small>{task.person}{task.username === user.username ? ' · deg' : ''}</small></div>{task.completedAt && <small>{when(task.completedAt)}</small>}{task.comment && <p className="task-comment">{task.comment}</p>}</div><span className={`status ${task.completedAt ? 'done' : ''}`}>{task.completedAt ? <CircleCheck size={17}/> : <Circle size={17}/>} {task.completedAt ? 'Utført' : 'Gjenstår'}</span></li>)}</ul></section>}</div>
       {weeks[1] && <details className="next-week"><summary>Neste uke <span>Uke {weeks[1].week}</span></summary><ul className="task-list">{weeks[1].assignments.map(task => <li key={task.id}><strong>{task.task}</strong><span>{task.person}</span></li>)}</ul></details>}
+      <TaskHistory request={request} revision={weeks}/>
       </>}
       </main></>}
       <footer>Nedre Bakklandet 69</footer>

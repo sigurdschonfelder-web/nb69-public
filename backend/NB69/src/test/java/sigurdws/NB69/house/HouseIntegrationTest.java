@@ -197,4 +197,35 @@ class HouseIntegrationTest {
         assertEquals("andreas",before.weeks().get(1).assignments().get(0).username());
     }
 
+    @Test void commentsAreOwnerOnlyBoundedIdempotentAndClearedOnUndo() throws Exception {
+        var week=house.weeks().get(0); var task=week.assignments().get(0);
+        String route="/api/weeks/"+week.start()+"/tasks/0/completion";
+        String other=task.username().equals("eilif") ? "sigurd" : "eilif";
+        mvc.perform(get("/api/history")).andExpect(status().isUnauthorized());
+        mvc.perform(post(route).with(user(other)).with(csrf()).contentType("application/json").content("{\"comment\":\"Feil person\"}")).andExpect(status().isForbidden());
+        mvc.perform(post(route).with(user(task.username())).with(csrf()).contentType("application/json").content(mapper.writeValueAsString(Map.of("comment","x".repeat(501))))).andExpect(status().isBadRequest());
+        assertNull(house.weeks().get(0).assignments().get(0).completedAt());
+        mvc.perform(post(route).with(user(task.username())).with(csrf()).contentType("application/json").content(mapper.writeValueAsString(Map.of("comment","  Tomt for såpe 🧼  ")))).andExpect(status().isNoContent());
+        mvc.perform(post(route).with(user(task.username())).with(csrf()).contentType("application/json").content("{\"comment\":\"Overskrevet\"}")).andExpect(status().isNoContent());
+        mvc.perform(get("/api/history").with(user(other))).andExpect(status().isOk()).andExpect(jsonPath("$[0].assignments[0].comment").value("Tomt for såpe 🧼"));
+        house.undo(week.start(),0,"eilif");
+        assertNull(house.history().get(0).assignments().get(0).comment());
+        assertNull(house.history().get(0).assignments().get(0).completedAt());
+    }
+    @Test void historyDoesNotGenerateWeeksAndIncludesLateCompletionsAcrossYears() {
+        var december=at("2026-12-31T12:00:00Z");
+        assertTrue(december.history().isEmpty());
+        var old=december.weeks().get(0);var task=old.assignments().get(0);
+        var january=at("2027-01-04T12:00:00Z");
+        january.weeks();
+        january.complete(old.start(),task.id(),task.username(),"Ferdig mandag");
+        var history=january.history();
+        assertEquals(2,history.size());
+        assertEquals(LocalDate.of(2027,1,4),history.get(0).start());
+        assertEquals(old.start(),history.get(1).start());
+        assertTrue(history.get(1).assignments().get(0).late());
+        assertEquals("Ferdig mandag",history.get(1).assignments().get(0).comment());
+        assertTrue(at("2027-04-05T12:00:00Z").history().isEmpty());
+    }
+
 }
