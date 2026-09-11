@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-export default function EmailProfileForm({ request, confirmation, onConfirmed }) {
+import ProfilePhoto from './ProfilePhoto';
+export default function EmailProfileForm({ user, onPhotoChanged, request, confirmation, onConfirmed }) {
   const [profile,setProfile]=useState(null);
   const [notice,setNotice]=useState('');
   const [error,setError]=useState('');
@@ -17,7 +18,8 @@ export default function EmailProfileForm({ request, confirmation, onConfirmed })
     try{setProfile(await request('/profile/email/confirm',json('POST',{token:confirmation})));setNotice('E-postadressen er bekreftet.');setPreview(null);onConfirmed();}
     catch(err){setError(err.message);}finally{setBusy(false);}
   }
-  return <><p className="eyebrow">Din konto</p><h1>Min profil</h1><p className="intro">Motta påminnelser om oppgavene dine.</p>
+  return <><p className="eyebrow">Din konto</p><h1>Min profil</h1><p className="intro">Profilbildet ditt og e-postpåminnelser.</p>
+    <ProfilePhoto user={user} request={request} onChanged={onPhotoChanged}/>
     {error&&<p className="error" role="alert">{error}</p>}{notice&&<p className="notice" role="status">{notice}</p>}
     {confirmation&&<section className="panel"><h2>Bekreft e-postadressen</h2><p>Bekreft at du vil bruke adressen du registrerte på denne kontoen.</p><button className="primary" disabled={busy} onClick={confirm}>Bekreft e-postadresse</button></section>}
     {!profile&&!error&&<p role="status">Henter profilen din…</p>}

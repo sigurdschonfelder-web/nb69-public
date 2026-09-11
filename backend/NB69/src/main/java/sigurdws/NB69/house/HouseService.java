@@ -34,8 +34,8 @@ public class HouseService {
     public HouseService(JdbcTemplate jdbc, PasswordEncoder encoder, Clock clock) {
         this.jdbc=jdbc; this.encoder=encoder; this.clock=clock;
     }
-    public record Resident(String username, String name, boolean admin, boolean active) {}
-    public record Task(int id, String task, String username, String person, Instant completedAt, boolean late) {}
+    public record Resident(String username, String name, boolean admin, boolean active, String avatarVersion) {}
+    public record Task(int id, String task, String username, String person, Instant completedAt, boolean late, String avatarVersion) {}
     public record Week(LocalDate start, int week, String label, Instant dueAt, boolean reminderDue, List<Task> assignments) {}
     public record Overdue(LocalDate start, int week, int id, String task, Instant dueAt) {}
     public record Dashboard(List<Week> weeks, List<Overdue> overdue) {}
@@ -53,8 +53,8 @@ public class HouseService {
     }
     public LocalDate currentStart() { return LocalDate.now(clock).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)); }
     public List<Resident> users() {
-        return jdbc.query("select * from nb69_users order by display_name", (rs, i) ->
-            new Resident(rs.getString("username"), rs.getString("display_name"), rs.getBoolean("admin"), rs.getString("password_hash") != null));
+        return jdbc.query("select u.*, a.version as avatar_version from nb69_users u left join nb69_avatars a on a.username=u.username order by display_name", (rs, i) ->
+            new Resident(rs.getString("username"), rs.getString("display_name"), rs.getBoolean("admin"), rs.getString("password_hash") != null, rs.getString("avatar_version")));
     }
     public Resident user(String username) {
         return users().stream().filter(u -> u.username().equals(username)).findFirst().orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Ukjent beboer."));
@@ -114,9 +114,9 @@ public class HouseService {
     private Week week(LocalDate start, String label) {
         ensureWeek(start);
         int week = start.get(WeekFields.ISO.weekOfWeekBasedYear());
-        var tasks = jdbc.query("select a.*, u.display_name from nb69_assignments a join nb69_users u on u.username=a.username where week_start=? order by task_id", (rs,i) -> {
+        var tasks = jdbc.query("select a.*, u.display_name, p.version as avatar_version from nb69_assignments a join nb69_users u on u.username=a.username left join nb69_avatars p on p.username=a.username where week_start=? order by task_id", (rs,i) -> {
             var completed = rs.getObject("completed_at", OffsetDateTime.class);
-            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant(), completed != null && !completed.toInstant().isBefore(deadline(start)));
+            return new Task(rs.getInt("task_id"), rs.getString("task_name"), rs.getString("username"), rs.getString("display_name"), completed == null ? null : completed.toInstant(), completed != null && !completed.toInstant().isBefore(deadline(start)), rs.getString("avatar_version"));
         }, start);
         return new Week(start, week, label, deadline(start), !clock.instant().isBefore(sundayReminder(start)) && clock.instant().isBefore(deadline(start)), tasks);
     }

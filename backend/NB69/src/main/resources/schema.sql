@@ -47,3 +47,9 @@ CREATE TABLE IF NOT EXISTS nb69_email_verification_limits (
  username VARCHAR(32) PRIMARY KEY REFERENCES nb69_users(username),
  last_sent TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS nb69_avatars (
+ username VARCHAR(32) PRIMARY KEY REFERENCES nb69_users(username),
+ image_base64 VARCHAR(300000) NOT NULL,
+ version VARCHAR(36) NOT NULL
+);

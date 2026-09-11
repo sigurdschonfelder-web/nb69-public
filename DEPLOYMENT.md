@@ -93,3 +93,10 @@ Resend-dokumentasjon: [domener](https://resend.com/docs/dashboard/domains/introd
 - Hvis Resend ikke er aktivert, lagres adressen som ubekreftet uten at appen hevder en e-post er sendt. Beboeren kan be om ny lenke når tjenesten er klar.
 - Lokalprofilen sender aldri e-post. Den viser i stedet en tydelig merket testlenke til den innloggede beboeren. Denne returverdien finnes ikke i produksjonsmodus. Lokalt verifiserte testadresser gjelder bare i den lokale databasen.
 - Hvis leverandøren gir en uavklart respons, beholdes lenken og ventetiden, og brukeren får beskjed om å sjekke innboksen eller be om en ny lenke senere.
+
+### Profilbilder
+
+- Beboere kan velge, forhåndsvise, lagre og fjerne eget profilbilde under Min profil. Bildet vises i toppfeltet og ved beboeren i ukens fellesoversikt. Uten bilde vises initialen.
+- Nettleseren tar JPG, PNG og WebP (maks 12 MB), bruker midten av bildet og lager en JPEG på 256 × 256 piksler før opplasting. HEIC må konverteres til JPG først.
+- Serveren kontrollerer faktisk bildeinnhold, filstørrelse og oppløsning og lager selv en ny 256 × 256 JPEG uten original metadata. SVG eller vilkårlige filer godtas ikke.
+- Bilder lagres i `nb69_avatars` i eksisterende database og overlever serveromstart. Tabellen opprettes automatisk av `schema.sql`; ingen ny lagringstjeneste trengs. Bilder kan bare hentes av innloggede beboere og kan bare endres av eieren. Ingen profilbilder er lagt i Git.
