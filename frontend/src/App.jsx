@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Circle, CircleCheck, Recycle, LogOut, Settings, ArrowLeft, House, TriangleAlert, Bell } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Circle, CircleCheck, Recycle, ArrowLeft, House, TriangleAlert, Bell } from 'lucide-react';
 import './index.css';
 import EmailProfileForm from './EmailProfileForm';
 import Avatar from './Avatar';
 import TaskDetails from './TaskDetails';
 import TaskHistory from './TaskHistory';
 import SharedHouse from './SharedHouse';
+import Navigation from './Navigation';
 
 let csrf;
 async function request(path, options = {}) {
@@ -110,22 +111,24 @@ export default function App() {
   const [overdue, setOverdue] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [admin, setAdmin] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [page, setPage] = useState('home');
+  const [incoming, setIncoming] = useState(0);
+  const mainRef = useRef(null);
+  function navigate(next) {setPage(next);setConfirmation(null);window.scrollTo(0,0);requestAnimationFrame(()=>mainRef.current?.focus());}
   const [confirmation, setConfirmation] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('confirm-email'));
   const [emailVerified, setEmailVerified] = useState(true);
   useEffect(() => {
     const readLink=() => {
       const token=new URLSearchParams(window.location.hash.slice(1)).get('confirm-email');
-      if(token) {setConfirmation(token);setProfileOpen(true);window.history.replaceState(null,'',window.location.pathname+window.location.search);}
+      if(token) {setConfirmation(token);setPage('profile');window.history.replaceState(null,'',window.location.pathname+window.location.search);}
     };
     readLink();window.addEventListener('hashchange',readLink);
     return () => window.removeEventListener('hashchange',readLink);
   }, []);
-  useEffect(() => {if(user) request('/profile/email').then(profile=>setEmailVerified(profile.verified)).catch(()=>{});}, [user, profileOpen]);
+  useEffect(() => {if(user) request('/profile/email').then(profile=>setEmailVerified(profile.verified)).catch(()=>{});}, [user, page]);
   async function refresh() { const data = await request('/dashboard'); setWeeks(data.weeks); setOverdue(data.overdue); }
   useEffect(() => {
-    function expired() { setUser(null); setWeeks([]); setOverdue([]); setAdmin(false); csrf = null; }
+    function expired() { setUser(null); setWeeks([]); setOverdue([]); setPage('home');setIncoming(0); csrf = null; }
     window.addEventListener('nb69-session-ended', expired);
     request('/me').then(setUser).catch(err => { if (!err.message.includes('Logg inn igjen')) setError(err.message); }).finally(() => setLoading(false));
     return () => window.removeEventListener('nb69-session-ended', expired);
@@ -137,6 +140,16 @@ export default function App() {
     load(); const interval = setInterval(load, 60000);
     return () => {active = false; clearInterval(interval);};
   }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    request('/shared/swaps').then(swaps=>{if(active)setIncoming(swaps.filter(s=>s.status==='PENDING'&&s.recipient===user.username).length);}).catch(()=>{});
+    return ()=>{active=false;};
+  }, [user, weeks]);
+  async function logout() {
+    try {await request('/logout',{method:'POST'});csrf=null;setUser(null);setWeeks([]);setOverdue([]);setPage('home');setIncoming(0);setConfirmation(null);}
+    catch(err){setError(err.message);}
+  }
   const current = weeks[0];
   const own = current?.assignments.filter(task => task.username === user?.username) || [];
   const count = current?.assignments.filter(task => task.completedAt).length || 0;
@@ -151,12 +164,12 @@ export default function App() {
     try {await request(`/weeks/${start}/tasks/${task.id}/completion`, json('POST', {comment})); await refresh(); return true;}
     catch (err) {setError(err.message); return false;} finally {setBusy(false);}
   }
-  return <div className="app-shell"><header className="app-header"><a href="/" className="brand" aria-label="NB69 hjem">NB<span>69</span><em>.</em></a>{user && <div className="account"><div>{user.name}<small>{user.admin ? 'Administrator' : 'Beboer'}</small></div><Avatar username={user.username} name={user.name} version={user.avatarVersion}/></div>}</header>
+  return <div className="app-shell"><header className="app-header"><a href="/" className="brand" aria-label="NB69 hjem">NB<span>69</span><em>.</em></a>{user && <div className="account"><div>{user.name}<small>{user.admin ? 'Administrator' : 'Beboer'}</small></div><Avatar username={user.username} name={user.name} version={user.avatarVersion}/><Navigation page={confirmation ? 'profile' : page} admin={user.admin} incoming={incoming} onNavigate={navigate} onLogout={logout}/></div>}</header>
     {loading ? <main><p role="status">Laster…</p></main> : !user ? <><Login onLogin={value => {setUser(value); setError('');}}/>{error && <p role="alert" className="error">{error}</p>}</> : <>
-      <nav className="toolbar"><button className="text-button" onClick={() => {setProfileOpen(!profileOpen);setAdmin(false);setConfirmation(null);}}>{profileOpen ? 'Tilbake til oppgavene' : 'Min profil'}</button>{user.admin && <button className="text-button" onClick={() => {setAdmin(!admin);setProfileOpen(false);}}>{admin ? <ArrowLeft size={17}/> : <Settings size={17}/>} {admin ? 'Tilbake til oppgavene' : 'Administrasjon'}</button>}<button className="text-button logout" onClick={async () => {try {await request('/logout', {method:'POST'}); csrf=null; setUser(null); setWeeks([]); setOverdue([]); setAdmin(false);} catch(err) {setError(err.message);}}}><LogOut size={16}/> Logg ut</button></nav>
-      <main>{error && <div className="error" role="alert">{error}<button className="text-button" onClick={() => refresh().then(() => setError('')).catch(err => setError(err.message))}>Prøv igjen</button></div>}
-      {profileOpen || confirmation ? <EmailProfileForm user={user} onPhotoChanged={async () => {setUser(await request('/me'));await refresh();}} request={request} confirmation={confirmation} onConfirmed={() => {setConfirmation(null);setEmailVerified(true);}}/> : admin ? <Admin weeks={weeks} refresh={refresh}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
-      {!emailVerified && <div className="notice"><strong>Legg inn og bekreft e-postadressen din</strong><p>Da kan du få påminnelser om oppgavene dine.</p><button className="text-button" onClick={() => setProfileOpen(true)}>Åpne Min profil</button></div>}
+      <main ref={mainRef} tabIndex={-1}>{page!=='home' && <button className="text-button back-link" onClick={()=>navigate('home')}><ArrowLeft size={17}/>Ukens oppgaver</button>}{error && <div className="error" role="alert">{error}<button className="text-button" onClick={() => refresh().then(() => setError('')).catch(err => setError(err.message))}>Prøv igjen</button></div>}
+      {page==='profile' || confirmation ? <EmailProfileForm user={user} onPhotoChanged={async () => {setUser(await request('/me'));await refresh();}} request={request} confirmation={confirmation} onConfirmed={() => {setConfirmation(null);setEmailVerified(true);}}/> : page==='admin' && user.admin ? <Admin weeks={weeks} refresh={refresh}/> : page==='swaps' || page==='shopping' ? <SharedHouse key={page} mode={page} user={user} request={request} refresh={refresh} revision={weeks}/> : page==='history' ? <TaskHistory request={request} revision={weeks} username={user.username} busy={busy} onUndo={undoOwn}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
+      {!emailVerified && <div className="notice"><strong>Legg inn og bekreft e-postadressen din</strong><p>Da kan du få påminnelser om oppgavene dine.</p><button className="text-button" onClick={() => navigate('profile')}>Åpne Min profil</button></div>}
+      {incoming>0 && <div className="notice"><strong>Du har {incoming} bytteforespørsel{incoming===1?'':'er'} å svare på</strong><button className="text-button" onClick={()=>navigate('swaps')}>Se forespørsler</button></div>}
       {!current && !error && <p role="status">Henter ukens oppgaver…</p>}
       {overdue.length > 0 && <section className="overdue-alert" aria-label="Oppgaver som har passert fristen"><div className="alert-heading"><TriangleAlert size={24}/><h2>Du har {overdue.length === 1 ? 'en oppgave' : `${overdue.length} oppgaver`} som haster</h2></div><p>Fristen er passert. Gjør ferdig oppgavene så snart som mulig og bekreft her.</p>{overdue.map(task => <article className="overdue-task" key={`${task.start}-${task.id}`}><h3>{task.task}</h3><p>Uke {task.week} · frist {when(new Date(new Date(task.dueAt).getTime()-1))}</p><TaskDetails task={task} busy={busy} onComplete={comment => complete(task,task.start,comment)}/></article>)}</section>}
       {current?.reminderDue && own.some(task => !task.completedAt) && <div className="deadline-reminder" role="status"><Bell size={21}/><div><strong>Husk oppgaven din i dag</strong><p>Ukens ansvar må være fullført før søndag er over.</p></div></div>}
@@ -165,8 +178,6 @@ export default function App() {
       {current && own.length === 0 && <div className="panel"><h2>Ingen oppgaver denne uka</h2><p className="muted">Du har ikke fått tildelt et ansvarsområde.</p></div>}
       </section>{current && <section className="household"><div className="section-heading"><h2>Hele leiligheten</h2><span aria-live="polite">{count} av {current.assignments.length} utført</span></div><progress aria-label="Utførte oppgaver" value={count} max={current.assignments.length || 1}/><ul className="task-list">{current.assignments.map(task => <li key={task.id}><div><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/><small>{task.person}{task.username === user.username ? ' · deg' : ''}</small></div>{task.completedAt && <small>{when(task.completedAt)}</small>}{task.comment && <p className="task-comment">{task.comment}</p>}</div><span className={`status ${task.completedAt ? 'done' : ''}`}>{task.completedAt ? <CircleCheck size={17}/> : <Circle size={17}/>} {task.completedAt ? 'Utført' : 'Gjenstår'}</span></li>)}</ul></section>}</div>
       {weeks[1] && <details className="next-week"><summary>Neste uke <span>Uke {weeks[1].week}</span></summary><ul className="task-list">{weeks[1].assignments.map(task => <li key={task.id}><strong>{task.task}</strong><span>{task.person}</span></li>)}</ul></details>}
-      <SharedHouse user={user} request={request} refresh={refresh} revision={weeks}/>
-      <TaskHistory request={request} revision={weeks} username={user.username} busy={busy} onUndo={undoOwn}/>
       </>}
       </main></>}
       <footer>Nedre Bakklandet 69</footer>

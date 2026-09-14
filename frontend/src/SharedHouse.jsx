@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 const json = (method, body) => ({method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 const weekLabel = week => `Uke ${week.week} · ${week.start}`;
 const statuses = {ACCEPTED:'Byttet er avtalt',DECLINED:'Avslått',CANCELLED:'Trukket tilbake',EXPIRED:'Ikke lenger mulig å gjennomføre'};
-export default function SharedHouse({ user, request, refresh, revision }) {
+export default function SharedHouse({ user, request, refresh, revision, mode }) {
   const [data,setData]=useState(null);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -29,12 +29,12 @@ export default function SharedHouse({ user, request, refresh, revision }) {
   const back=returns.find(task=>task.key===returnKey);
   const incoming=data?.swaps.filter(swap=>swap.status==='PENDING' && swap.recipient===user.username).length || 0;
   return <section className="shared-house" aria-label="Felles i leiligheten">
-    <h2>Felles i leiligheten</h2>
+    <h1>{mode==='swaps' ? 'Bytte oppgave / borte' : 'Handleliste'}</h1>
     {error&&<div className="error" role="alert">{error}<button className="text-button" onClick={()=>setRetry(retry+1)}>Prøv igjen</button></div>}
     {notice&&<p className="success" role="status">{notice}</p>}
     {!data&&!error&&<p role="status">Henter bytter og handleliste…</p>}
-    {!!incoming&&<p className="notice" role="status">Du har {incoming} bytteforespørsel{incoming===1?'':'er'} å svare på. Åpne «Borte denne uka / bytt oppgave» nedenfor.</p>}
-    {data&&<><details className="next-week"><summary>Borte denne uka / bytt oppgave</summary>
+    {mode==='swaps'&&!!incoming&&<p className="notice" role="status">Du har {incoming} bytteforespørsel{incoming===1?'':'er'} å svare på.</p>}
+    {data&&<>{mode==='swaps'&&<section>
       <p className="muted">Be noen ta oppgaven din, og ta deres en senere uke. Ansvaret ditt gjelder til den andre godtar. Dere kan planlegge åtte uker framover.</p>
       <form className="shared-form" onSubmit={async event=>{event.preventDefault();if(!away||!back)return;if(await run(()=>request('/shared/swaps',json('POST',{awayWeek:away.start,awayTask:away.id,returnWeek:back.start,returnTask:back.id})),'Forespørselen er sendt. Ansvaret endres når den andre godtar.')){setAwayKey('');setReturnKey('');}}}>
         <label>Oppgaven jeg trenger hjelp med<select required disabled={busy} value={awayKey} onChange={event=>{setAwayKey(event.target.value);setReturnKey('');}}><option value="">Velg din oppgave og uke</option>{own.map(task=><option key={task.key} value={task.key}>{weekLabel(task)} · {task.task}</option>)}</select></label>
@@ -49,12 +49,12 @@ export default function SharedHouse({ user, request, refresh, revision }) {
         <small>{swap.status==='PENDING'?`Venter på ${swap.recipientName}`:statuses[swap.status]}</small>
         {swap.status==='PENDING'&&<div className="shared-actions">{swap.recipient===user.username?<><button className="secondary" disabled={busy} onClick={()=>run(()=>request(`/shared/swaps/${swap.id}/decision`,json('POST',{action:'ACCEPT'})),'Byttet er godtatt og oppgavene er oppdatert.')}>Godta byttet</button><button className="text-button" disabled={busy} onClick={()=>run(()=>request(`/shared/swaps/${swap.id}/decision`,json('POST',{action:'DECLINE'})),'Forespørselen er avslått.')}>Avslå</button></>:<button className="text-button" disabled={busy} onClick={()=>run(()=>request(`/shared/swaps/${swap.id}/decision`,json('POST',{action:'CANCEL'})),'Forespørselen er trukket tilbake.')}>Trekk tilbake</button>}</div>}
       </article>)}
-    </details>
-    <details className="next-week"><summary>Felles handleliste <span>{data.items.filter(item=>!item.boughtBy).length} varer</span></summary>
+    </section>}
+    {mode==='shopping'&&<section><p className="intro">{data.items.filter(item=>!item.boughtBy).length} varer gjenstår</p>
       <form className="shared-form" onSubmit={async event=>{event.preventDefault();if(await run(()=>request('/shared/shopping',json('POST',{name})),'Varen er lagt til.'))setName('');}}><label>Hva mangler vi?<input value={name} onChange={event=>setName(event.target.value)} maxLength={120} required disabled={busy} placeholder="For eksempel dopapir"/></label><button className="secondary" disabled={busy||!name.trim()}>Legg til</button></form>
       {!data.items.some(item=>!item.boughtBy)&&<p className="muted">Alt på listen er kjøpt. Legg til det dere mangler.</p>}
       <ul className="shopping-list">{data.items.filter(item=>!item.boughtBy).map(item=><li key={item.id}><label><input type="checkbox" disabled={busy} checked={false} onChange={()=>run(()=>request(`/shared/shopping/${item.id}`,json('PUT',{bought:true})),'Markert som kjøpt.')}/><span>{item.name}<small>Lagt til av {item.addedName}</small></span></label></li>)}</ul>
       {data.items.some(item=>item.boughtBy)&&<details><summary className="bought-summary">Kjøpte varer</summary><ul className="shopping-list">{data.items.filter(item=>item.boughtBy).map(item=><li key={item.id}><label><input type="checkbox" disabled={busy} checked onChange={()=>run(()=>request(`/shared/shopping/${item.id}`,json('PUT',{bought:false})),'Varen er tilbake på handlelisten.')}/><span><s>{item.name}</s><small>Kjøpt av {item.boughtName} · fjern krysset for å angre</small></span></label></li>)}</ul></details>}
-    </details></>}
+    </section>}</>}
   </section>;
 }
