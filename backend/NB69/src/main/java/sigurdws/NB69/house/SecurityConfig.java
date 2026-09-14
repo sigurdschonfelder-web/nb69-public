@@ -32,7 +32,7 @@ public class SecurityConfig {
         return http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/prikker", "/api/prikker/**").denyAll()
-                .requestMatchers("/api/csrf", "/api/login", "/api/activate", "/error").permitAll()
+                .requestMatchers("/api/csrf", "/api/login", "/api/activate", "/api/password-reset/request", "/api/password-reset/confirm", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .sessionManagement(session -> session.maximumSessions(-1).sessionRegistry(sessions)

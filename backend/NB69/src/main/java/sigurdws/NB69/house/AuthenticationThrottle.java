@@ -19,7 +19,7 @@ final class AuthenticationThrottle extends OncePerRequestFilter {
         attempts.put(key, new Attempts(old.until(), old.count()+1)); return true;
     }
     @Override protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain) throws ServletException, IOException {
-        if (req.getMethod().equals("POST") && (req.getServletPath().equals("/api/login") || req.getServletPath().equals("/api/activate"))) {
+        if (req.getMethod().equals("POST") && (req.getServletPath().equals("/api/login") || req.getServletPath().equals("/api/activate") || req.getServletPath().startsWith("/api/password-reset/"))) {
             boolean permitted = allow("ip:" + req.getRemoteAddr(), 60);
             if (req.getServletPath().equals("/api/login")) permitted &= allow("user:" + Objects.toString(req.getParameter("username"), "").toLowerCase(Locale.ROOT), 15);
             if (!permitted) {

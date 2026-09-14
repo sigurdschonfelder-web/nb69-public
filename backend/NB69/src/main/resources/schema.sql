@@ -74,3 +74,12 @@ CREATE TABLE IF NOT EXISTS nb69_shopping (
  added_by VARCHAR(32) NOT NULL REFERENCES nb69_users(username),
  bought_by VARCHAR(32) REFERENCES nb69_users(username)
 );
+
+CREATE TABLE IF NOT EXISTS nb69_password_resets (
+ username VARCHAR(32) PRIMARY KEY REFERENCES nb69_users(username),
+ token_hash VARCHAR(64),
+ email VARCHAR(254) NOT NULL,
+ password_snapshot VARCHAR(100),
+ expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+ requested_at TIMESTAMP WITH TIME ZONE NOT NULL
+);

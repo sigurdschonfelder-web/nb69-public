@@ -37,7 +37,7 @@ Lokal H2-database ligger i `.local`, og oppgaver og passord overlever omstart. I
 - Hver uke får egne oppgaver og egne bekreftelser. Fra 14. september 2026 følger hvert område rekkefølgen Andreas → Sigurd → Jørgen → Eilif → Erlend, med sammenhengende uketelling også over årsskiftet. Før dette brukes opprinnelig rotasjon. Allerede lagret historikk og manuelle tildelinger beholdes. Forhåndsgenererte fremtidige uker oppgraderes én gang til ny rotasjon. Tidssone er Europe/Oslo. Neste uke kan ses, men ikke bekreftes på forhånd. Eldre uferdige oppgaver kan bekreftes etter fristen og lagres som forsinket.
 - Admin kan tildele oppgaver denne og neste uke, angre feilregistreringer og lage aktiverings-/passordresetkoder. Tildeling lagres for den valgte uka, ikke som en varig endring av rotasjonen. Utførte oppgaver må angres før omfordeling. Endringer loggføres i `nb69_audit`.
 - Bekreftelse er idempotent og kontrolleres på serveren mot innlogget bruker. Neste ukes oppgaver viser aldri denne ukas bekreftelser.
-- Fristen er utgangen av søndag, med norsk tid og korrekt sommer-/vintertid. Egne uferdige oppgaver fra tidligere uker vises som et tydelig varsel helt til de blir bekreftet. Ingen bilder eller egen historikkside; historiske bekreftelser beholdes i databasen.
+- Fristen er utgangen av søndag, med norsk tid og korrekt sommer-/vintertid. Egne uferdige oppgaver fra tidligere uker vises som et tydelig varsel helt til de blir bekreftet. Profilbilder og historikk er tilgjengelig for innloggede beboere.
 - Passord lagres med BCrypt. Aktiveringskoder lagres som SHA-256-hash, er engangsbruk og utløper etter 24 timer. Passordendring avslutter gamle økter på samme server.
 - Kjør én Render-instans i denne første versjonen. Økter og begrensning av innloggingsforsøk ligger i minnet. Flere instanser krever delt øktlagring og delt begrensning av innloggingsforsøk. Det er 15 innloggingsforsøk per brukernavn og 60 login/aktiveringsforsøk per direkte nettverksadresse per 15 minutter. Bak proxy kan adressegrensen være delt mellom beboerne.
 - Oppbevar databasebackup i Neon. En utrulling av gammel kode ruller ikke tilbake tabellene, men de er separate og kan stå urørt.
@@ -116,3 +116,13 @@ Beboere kan angre egne fullføringer fra oppgavekortet eller historikken. Dette 
 Ved godkjenning låses og kontrolleres begge oppgavene på nytt, og eierne endres i samme databasetransaksjon. Utførte, omfordelte eller utløpte oppgaver kan ikke byttes. Overlappende åpne forespørsler avvises. Et gjennomført bytte endrer ikke den faste rotasjonen. Planleggingsvisningen lagrer sammenhengende ukefordelinger åtte uker framover.
 
 Alle innloggede beboere kan legge inn varer og markere dem som kjøpt. Navnet på den som la til og kjøpte varen lagres. Avkrysning kan angres under «Kjøpte varer». Listen viser opptil 200 varer med alle åpne først, og tillater maksimalt 100 åpne varer. Navn kan ha opptil 120 tegn. Data lagres i de nye tabellene `nb69_swaps` og `nb69_shopping`, som opprettes automatisk ved oppstart.
+
+### Glemt passord via e-post
+
+«Glemt passord?» på innloggingssiden sender en engangslenke til kontoens allerede bekreftede e-postadresse. Lenken gjelder i 30 minutter. Token lagres kun som SHA-256-hash og fjernes fra adressefeltet når siden åpnes. POST krever CSRF. Samme generelle svar gis for kjente, ukjente og ubekreftede kontoer; ingen token returneres via API.
+
+Det er fem minutters ventetid mellom utsendingsforsøk per konto, bevart i databasen, og nettverksgrensen for autentiseringsforsøk gjelder også disse endepunktene. Leverandørfeil bruker også ventetiden, siden levering kan ha skjedd. En ny lenke erstatter den gamle. Brukt lenke, utløp, endret passord eller endret/ubekreftet e-post ugyldiggjør lenken. Passordbytte avslutter gamle økter på serveren og fjerner eventuelle aktiveringskoder.
+
+Lokalprofilen sender aldri ekte passord-e-post og utleverer heller ingen passordlenke i svaret. Testene bruker falsk sender. Bruk adminens aktiveringskode lokalt, eller test hele e-postreisen på felles testside. Tabellen `nb69_password_resets` opprettes ved oppstart.
+
+Se [TESTSITE.md](TESTSITE.md) for et separat testoppsett som Sigurd kan publisere med sine tilganger.

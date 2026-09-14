@@ -7,6 +7,7 @@ import TaskDetails from './TaskDetails';
 import TaskHistory from './TaskHistory';
 import SharedHouse from './SharedHouse';
 import Navigation from './Navigation';
+import PasswordHelp from './PasswordHelp';
 
 let csrf;
 async function request(path, options = {}) {
@@ -33,11 +34,11 @@ const json = (method, body) => ({ method, headers: { 'Content-Type': 'applicatio
 const people = [['eilif','Eilif'],['sigurd','Sigurd'],['andreas','Andreas'],['jorgen','Jørgen'],['erlend','Erlend']];
 const when = value => new Intl.DateTimeFormat('nb-NO', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Europe/Oslo' }).format(new Date(value));
 
-function Login({ onLogin }) {
+function Login({ onLogin, onForgot, resetDone }) {
   const [activate, setActivate] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(resetDone ? 'Passordet er endret. Logg inn med det nye passordet.' : '');
   async function submit(event) {
     event.preventDefault(); setError(''); setNotice(''); setBusy(true);
     const data = new FormData(event.currentTarget);
@@ -62,7 +63,8 @@ function Login({ onLogin }) {
       {activate && <p className="muted">Bruk minst 12 tegn. Du får aktiveringskode fra Eilif eller Sigurd.</p>}
       {error && <p className="error" role="alert">{error}</p>}{notice && <p className="success" role="status">{notice}</p>}
       <button className="primary" disabled={busy}>{busy ? 'Et øyeblikk…' : activate ? 'Lagre passord' : 'Logg inn'}</button>
-      <button className="text-button" type="button" disabled={busy} onClick={() => {setActivate(!activate); setError(''); setNotice('');}}>{activate ? 'Tilbake til innlogging' : 'Ny bruker eller glemt passord?'}</button>
+      <button className="text-button" type="button" disabled={busy} onClick={() => {setActivate(!activate); setError(''); setNotice('');}}>{activate ? 'Tilbake til innlogging' : 'Aktiver konto med kode'}</button>
+      {!activate && <button className="text-button" type="button" disabled={busy} onClick={onForgot}>Glemt passord?</button>}
     </form>
   </main>;
 }
@@ -117,9 +119,15 @@ export default function App() {
   function navigate(next) {setPage(next);setConfirmation(null);window.scrollTo(0,0);requestAnimationFrame(()=>mainRef.current?.focus());}
   const [confirmation, setConfirmation] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('confirm-email'));
   const [emailVerified, setEmailVerified] = useState(true);
+  const [resetToken,setResetToken]=useState(()=>new URLSearchParams(window.location.hash.slice(1)).get('reset-password'));
+  const [forgot,setForgot]=useState(false);
+  const [resetDone,setResetDone]=useState(false);
   useEffect(() => {
     const readLink=() => {
-      const token=new URLSearchParams(window.location.hash.slice(1)).get('confirm-email');
+      const params=new URLSearchParams(window.location.hash.slice(1));
+      const reset=params.get('reset-password');
+      if(reset){setResetToken(reset);setConfirmation(null);window.history.replaceState(null,'',window.location.pathname+window.location.search);return;}
+      const token=params.get('confirm-email');
       if(token) {setConfirmation(token);setPage('profile');window.history.replaceState(null,'',window.location.pathname+window.location.search);}
     };
     readLink();window.addEventListener('hashchange',readLink);
@@ -165,7 +173,7 @@ export default function App() {
     catch (err) {setError(err.message); return false;} finally {setBusy(false);}
   }
   return <div className="app-shell"><header className="app-header"><a href="/" className="brand" aria-label="NB69 hjem">NB<span>69</span><em>.</em></a>{user && <div className="account"><div>{user.name}<small>{user.admin ? 'Administrator' : 'Beboer'}</small></div><Avatar username={user.username} name={user.name} version={user.avatarVersion}/><Navigation page={confirmation ? 'profile' : page} admin={user.admin} incoming={incoming} onNavigate={navigate} onLogout={logout}/></div>}</header>
-    {loading ? <main><p role="status">Laster…</p></main> : !user ? <><Login onLogin={value => {setUser(value); setError('');}}/>{error && <p role="alert" className="error">{error}</p>}</> : <>
+    {loading ? <main><p role="status">Laster…</p></main> : resetToken || forgot ? <PasswordHelp key={resetToken || 'request'} request={request} people={people} token={resetToken} onBack={()=>{setResetToken(null);setForgot(false);}} onReset={()=>{setResetToken(null);setForgot(false);setResetDone(true);setUser(null);setPage('home');setConfirmation(null);csrf=null;}}/> : !user ? <><Login resetDone={resetDone} onForgot={()=>setForgot(true)} onLogin={value => {setUser(value); setError('');}}/>{error && <p role="alert" className="error">{error}</p>}</> : <>
       <main ref={mainRef} tabIndex={-1}>{page!=='home' && <button className="text-button back-link" onClick={()=>navigate('home')}><ArrowLeft size={17}/>Ukens oppgaver</button>}{error && <div className="error" role="alert">{error}<button className="text-button" onClick={() => refresh().then(() => setError('')).catch(err => setError(err.message))}>Prøv igjen</button></div>}
       {page==='profile' || confirmation ? <EmailProfileForm user={user} onPhotoChanged={async () => {setUser(await request('/me'));await refresh();}} request={request} confirmation={confirmation} onConfirmed={() => {setConfirmation(null);setEmailVerified(true);}}/> : page==='admin' && user.admin ? <Admin weeks={weeks} refresh={refresh}/> : page==='swaps' || page==='shopping' ? <SharedHouse key={page} mode={page} user={user} request={request} refresh={refresh} revision={weeks}/> : page==='history' ? <TaskHistory request={request} revision={weeks} username={user.username} busy={busy} onUndo={undoOwn}/> : <><p className="eyebrow">Hjemme på Bakklandet{current ? ` · uke ${current.week}` : ''}</p><h1>Hei, {user.name}.</h1><p className="intro">Litt fra hver. Et bedre sted å bo.</p>
       {!emailVerified && <div className="notice"><strong>Legg inn og bekreft e-postadressen din</strong><p>Da kan du få påminnelser om oppgavene dine.</p><button className="text-button" onClick={() => navigate('profile')}>Åpne Min profil</button></div>}

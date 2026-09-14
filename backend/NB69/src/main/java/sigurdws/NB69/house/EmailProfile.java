@@ -42,6 +42,7 @@ public class EmailProfile {
         if(!last.isEmpty() && last.get(0).toInstant().plusSeconds(60).isAfter(clock.instant()))
             throw new ResponseStatusException(TOO_MANY_REQUESTS,"Vent ett minutt før du ber om en ny bekreftelseslenke.");
         reminders.contact(username,email);
+        jdbc.update("update nb69_password_resets set token_hash=null,password_snapshot=null where username=?",username);
         if(!local && !sender.ready()) return new Result(profile(username),"Adressen er lagret. E-posttjenesten er ikke aktivert ennå. Be om bekreftelseslenke når den er klar.",null);
         byte[] random=new byte[32];new SecureRandom().nextBytes(random);
         String token=Base64.getUrlEncoder().withoutPadding().encodeToString(random);
