@@ -19,6 +19,6 @@ export default function TaskDetails({ task, busy, onComplete, onUndo }) {
       <details className="task-details"><summary>Legg igjen en kommentar</summary><label>Kommentar (valgfritt)<textarea value={comment} onChange={event => setComment(event.target.value)} maxLength={500} rows={3} disabled={busy} placeholder="For eksempel: Vi er tomme for oppvaskmiddel."/></label><small>Synlig for alle i leiligheten · {comment.length}/500 tegn</small></details>
       <button className="primary" disabled={busy}>{busy ? 'Lagrer…' : 'Bekreft utført'}</button>
     </form>}
-    {task.completedAt && <><div className="primary completed">✓ Utført</div>{onUndo && <button type="button" className="text-button" disabled={busy} onClick={onUndo}>Angre registrering</button>}{task.comment && <p className="task-comment">{task.comment}</p>}</>}
+    {task.completedAt && <><div className="completion-receipt"><strong role="status">✓ Oppgaven er registrert</strong>{onUndo && <button type="button" className="text-button" disabled={busy} onClick={onUndo}>Angre registrering</button>}</div>{task.comment && <p className="task-comment">{task.comment}</p>}</>}
   </>;
 }
