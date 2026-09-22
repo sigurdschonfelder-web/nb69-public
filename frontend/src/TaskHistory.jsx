@@ -1,0 +1,23 @@
+import { useEffect, useState } from 'react';
+import Avatar from './Avatar';
+import { weekRange } from './dates';
+const when = value => new Intl.DateTimeFormat('nb-NO', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Europe/Oslo'}).format(new Date(value));
+export default function TaskHistory({ request, revision, username, busy, onUndo }) {
+  const [weeks, setWeeks] = useState(null);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    request('/history').then(data => {if(active){setWeeks(data);setError('');}}).catch(err => {if(active)setError(err.message);});
+    return () => {active=false;};
+  }, [request, revision, retry]);
+  return <section className="history"><h1>Historikk</h1><p className="intro">Siste 12 uker</p>
+    <p className="muted">Ansvar, tidspunkt og kommentarer for hele leiligheten. Uker vises fra dere begynte å bruke siden.</p>
+    {error && <div role="alert" className="error">{error}<button className="text-button" onClick={() => setRetry(retry+1)}>Prøv igjen</button></div>}
+    {!weeks && !error && <p role="status">Henter historikk…</p>}
+    {weeks?.length === 0 && <p>Ingen oppgaver registrert ennå.</p>}
+    {weeks?.map(week => <details className="history-week" key={week.start}><summary>Uke {week.week} · {weekRange(week.start)}<span>{week.assignments.filter(task=>task.completedAt).length} av {week.assignments.length} utført</span></summary>
+      <ul className="task-list">{week.assignments.map(task => <li key={task.id}><div className="history-entry"><strong>{task.task}</strong><div className="resident-label"><Avatar username={task.username} name={task.person} version={task.avatarVersion}/>{task.person}</div><p className={task.completedAt ? 'done' : 'muted'}>{task.completedAt ? `Utført ${when(task.completedAt)}${task.late ? ' · Etter fristen' : ' · Innen fristen'}` : new Date(week.dueAt) <= new Date() ? 'Ikke utført · Fristen er passert' : 'Gjenstår'}</p>{task.comment && <p className="task-comment">{task.comment}</p>}{task.completedAt && task.username === username && <button className="text-button" disabled={busy} onClick={() => onUndo(task,week.start)}>Angre registrering</button>}</div></li>)}</ul>
+    </details>)}
+  </section>;
+}
