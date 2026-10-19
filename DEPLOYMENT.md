@@ -60,7 +60,7 @@ npm run lint
 - Frist er mandag kl. 00.00 (altså innen hele søndagen er over), Europe/Oslo. Bekreftelser før dette tidspunktet er i tide. Senere bekreftelser får `late=true`, uten tilbakedatering.
 - Søndag fra kl. 14 vises påminnelse på siden. Fra mandag kl. 00 vises tidligere uferdige oppgaver som et personlig hastevarsel med egen «Bekreft utført»-knapp. Bare eieren kan bekrefte dem.
 - Manglende ukeplaner fylles fra første lagrede uke når systemet brukes igjen. Ingen restanser opprettes før første bruk.
-- E-postpåminnelse søndag kl. 14 og purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. Serverjobben sjekker hvert minutt og kan ta igjen utsending senere samme søndag/mandag. Ingen gamle søndagspåminnelser sendes på mandag. Bekreftelse før utsending avlyser påminnelsen.
+- E-postpåminnelse søndag kl. 14 og purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. Serverjobben sjekker ved starten av vinduet og deretter én gang i timen, og kan ta igjen utsending senere samme søndag/mandag. Sjeldnere kjøring lar Neon-databasen gå i dvale mellom kjøringene. Ingen gamle søndagspåminnelser sendes på mandag. Bekreftelse før utsending avlyser påminnelsen.
 
 ### Koble til Resend
 
@@ -111,7 +111,7 @@ Beboere kan angre egne fullføringer fra oppgavekortet eller historikken. Dette 
 
 ### Bytte mellom uker og felles handleliste
 
-«Felles i leiligheten» inneholder inngangen «Borte denne uka / bytt oppgave». Beboeren velger sin ufullførte oppgave og en annen beboers oppgave i en senere uke, innenfor inneværende uke og sju uker framover. Dette registrerer en bytteforespørsel, ikke et automatisk fritak eller en separat fraværskalender. Bare mottakeren kan godta eller avslå; avsender kan trekke tilbake. Ingen e-post eller SMS sendes for bytter. Forespørsler vises på siden og hentes på nytt med ukeoversikten omtrent hvert minutt.
+«Felles i leiligheten» inneholder inngangen «Borte denne uka / bytt oppgave». Beboeren velger sin ufullførte oppgave og en annen beboers oppgave i en senere uke, innenfor inneværende uke og sju uker framover. Dette registrerer en bytteforespørsel, ikke et automatisk fritak eller en separat fraværskalender. Bare mottakeren kan godta eller avslå; avsender kan trekke tilbake. Ingen e-post eller SMS sendes for bytter. Forespørsler vises på siden og hentes på nytt med ukeoversikten omtrent hvert minutt mens siden er synlig. Faner i bakgrunnen henter ikke data, slik at databasen kan gå i dvale.
 
 Ved godkjenning låses og kontrolleres begge oppgavene på nytt, og eierne endres i samme databasetransaksjon. Utførte, omfordelte eller utløpte oppgaver kan ikke byttes. Overlappende åpne forespørsler avvises. Et gjennomført bytte endrer ikke den faste rotasjonen. Planleggingsvisningen lagrer sammenhengende ukefordelinger åtte uker framover.
 

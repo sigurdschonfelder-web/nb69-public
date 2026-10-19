@@ -146,8 +146,11 @@ export default function App() {
     if (!user) return;
     let active = true;
     const load = () => request('/dashboard').then(data => { if (active) {setWeeks(data.weeks); setOverdue(data.overdue); setError('');} }).catch(err => {if (active) setError(err.message);});
-    load(); const interval = setInterval(load, 60000);
-    return () => {active = false; clearInterval(interval);};
+    // Background tabs skip polling so an open tab doesn't keep the database awake.
+    const poll = () => { if (!document.hidden) load(); };
+    load(); const interval = setInterval(poll, 60000);
+    document.addEventListener('visibilitychange', poll);
+    return () => {active = false; clearInterval(interval); document.removeEventListener('visibilitychange', poll);};
   }, [user]);
   useEffect(() => {
     if (!user) return;
