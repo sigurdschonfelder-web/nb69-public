@@ -31,7 +31,6 @@ public class SecurityConfig {
     @Bean SecurityFilterChain security(HttpSecurity http, org.springframework.security.core.session.SessionRegistry sessions) throws Exception {
         return http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/prikker", "/api/prikker/**").denyAll()
                 .requestMatchers("/api/csrf", "/api/login", "/api/activate", "/api/password-reset/request", "/api/password-reset/confirm", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
