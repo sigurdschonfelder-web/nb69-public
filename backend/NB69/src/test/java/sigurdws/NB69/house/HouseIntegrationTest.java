@@ -31,12 +31,12 @@ class HouseIntegrationTest {
         jdbc.update("delete from nb69_assignments"); jdbc.update("delete from nb69_audit");
         jdbc.update("update nb69_users set password_hash=null, activation_hash=null, activation_expires=null");
     }
-    @Test void anonymousCannotReadAndResidentsCannotAdminOrUseOldPrikker() throws Exception {
+    @Test void anonymousCannotReadAndResidentsCannotAdminAndOldPrikkerIsGone() throws Exception {
         mvc.perform(get("/api/weeks")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/admin/users").with(user("andreas").roles("RESIDENT"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/admin/users").with(user("eilif").roles("ADMIN"))).andExpect(status().isOk());
         mvc.perform(put("/api/prikker/update").with(user("eilif").roles("ADMIN")).with(csrf()).contentType("application/json").content("{}"))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isNotFound());
         assertTrue(house.user("eilif").admin()); assertTrue(house.user("sigurd").admin()); assertFalse(house.user("andreas").admin());
     }
     @Test void activationIsOneUseAndLoginUsesPersonalPassword() throws Exception {

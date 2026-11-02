@@ -1,6 +1,6 @@
 # NB69: test og publisering
 
-Denne grenen erstatter prikkevisningen med personlige kontoer og ukentlig bekreftelse. Gamle prikketabeller og data slettes ikke. Gamle prikke-API-er er blokkert, også for admin.
+Appen bruker personlige kontoer og ukentlig bekreftelse. Det gamle prikksystemet er fjernet fra koden. Den gamle `prikker`-tabellen i Neon brukes ikke og kan slettes manuelt med `DROP TABLE IF EXISTS prikker;` etter backup.
 
 ## Lokal test
 
@@ -26,10 +26,10 @@ Lokal H2-database ligger i `.local`, og oppgaver og passord overlever omstart. I
 1. Gå gjennom denne grenen og test med minst én beboer og én administrator. Ta backup av Neon før databaseendringer. Kontroller de faktiske tjenestene og eksisterende miljøvariabler.
 2. Sett Render-variablene `DATABASE_URL` (JDBC-format: `jdbc:postgresql://HOST/DATABASE?sslmode=require`), `DATABASE_USERNAME` og `DATABASE_PASSWORD`. Ikke bruk lokalprofilen i produksjon. `PORT` støttes fortsatt. Java 21 kreves.
 3. Sett `NB69_BOOTSTRAP_CODE` til en tilfeldig kode på minst 24 tegn før første oppstart. Denne aktiverer bare Eilif. Etter at Eilif har satt passordet sitt, fjern variabelen og start på nytt. Eilif oppretter private aktiveringskoder for de fire andre. Sigurd får automatisk adminrettigheter.
-4. Oppstart kjører `schema.sql`, som bare oppretter de nye tabellene `nb69_users`, `nb69_assignments` og `nb69_audit` hvis de mangler. Den eksisterende `prikker`-tabellen berøres ikke. Det legges ikke inn testpassord i produksjon.
+4. Oppstart kjører `schema.sql`, som bare oppretter de nye tabellene `nb69_users`, `nb69_assignments` og `nb69_audit` hvis de mangler. Det legges ikke inn testpassord i produksjon.
 5. Kopier `frontend/vercel.example.json` til `frontend/vercel.json`, og erstatt `REPLACE-WITH-RENDER-HOST` med den verifiserte Render-adressen. Vercel må bruke `frontend` som rot, `npm run build` som byggkommando og `dist` som publiseringsmappe. Frontend bruker alltid `/api`; den gamle `VITE_API_BASE` brukes ikke av den nye appen.
 6. Publiser serveren og frontend koordinert. API-proxyen må bevare `Set-Cookie` og `Cookie`. All trafikk fra nettleseren skal gå gjennom nettsidens eget domene. Innlogging bruker en HttpOnly, Secure, SameSite=Lax-øktcookie i produksjon, og CSRF-token for alle endringer. Ikke åpne opp CORS som en erstatning for proxyen.
-7. Test på den faktiske HTTPS-adressen: aktivering, login, logout, oppdatering av side, avkryssing, vanlig brukers manglende admintilgang og to separate brukere. Kontroller også at prikke-API-et gir 403, og at `/api/me` gir 401 uten innlogging. Lokal test bekrefter ikke Vercel/Render-oppsettet.
+7. Test på den faktiske HTTPS-adressen: aktivering, login, logout, oppdatering av side, avkryssing, vanlig brukers manglende admintilgang og to separate brukere. Kontroller også at `/api/me` gir 401 uten innlogging. Lokal test bekrefter ikke Vercel/Render-oppsettet.
 
 ## Omfang og drift
 
@@ -60,7 +60,7 @@ npm run lint
 - Frist er mandag kl. 00.00 (altså innen hele søndagen er over), Europe/Oslo. Bekreftelser før dette tidspunktet er i tide. Senere bekreftelser får `late=true`, uten tilbakedatering.
 - Søndag fra kl. 14 vises påminnelse på siden. Fra mandag kl. 00 vises tidligere uferdige oppgaver som et personlig hastevarsel med egen «Bekreft utført»-knapp. Bare eieren kan bekrefte dem.
 - Manglende ukeplaner fylles fra første lagrede uke når systemet brukes igjen. Ingen restanser opprettes før første bruk.
-- E-postpåminnelse søndag kl. 14 og purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. Serverjobben sjekker hvert minutt og kan ta igjen utsending senere samme søndag/mandag. Ingen gamle søndagspåminnelser sendes på mandag. Bekreftelse før utsending avlyser påminnelsen.
+- E-postpåminnelse søndag kl. 14 og purring mandag kl. 08 for forrige uke, bare hvis oppgaven fortsatt er uferdig. Serverjobben sjekker ved starten av vinduet og deretter én gang i timen, og kan ta igjen utsending senere samme søndag/mandag. Sjeldnere kjøring lar Neon-databasen gå i dvale mellom kjøringene. Ingen gamle søndagspåminnelser sendes på mandag. Bekreftelse før utsending avlyser påminnelsen.
 
 ### Koble til Resend
 
@@ -111,7 +111,7 @@ Beboere kan angre egne fullføringer fra oppgavekortet eller historikken. Dette 
 
 ### Bytte mellom uker og felles handleliste
 
-«Felles i leiligheten» inneholder inngangen «Borte denne uka / bytt oppgave». Beboeren velger sin ufullførte oppgave og en annen beboers oppgave i en senere uke, innenfor inneværende uke og sju uker framover. Dette registrerer en bytteforespørsel, ikke et automatisk fritak eller en separat fraværskalender. Bare mottakeren kan godta eller avslå; avsender kan trekke tilbake. Ingen e-post eller SMS sendes for bytter. Forespørsler vises på siden og hentes på nytt med ukeoversikten omtrent hvert minutt.
+«Felles i leiligheten» inneholder inngangen «Borte denne uka / bytt oppgave». Beboeren velger sin ufullførte oppgave og en annen beboers oppgave i en senere uke, innenfor inneværende uke og sju uker framover. Dette registrerer en bytteforespørsel, ikke et automatisk fritak eller en separat fraværskalender. Bare mottakeren kan godta eller avslå; avsender kan trekke tilbake. Ingen e-post eller SMS sendes for bytter. Forespørsler vises på siden og hentes på nytt med ukeoversikten omtrent hvert minutt mens siden er synlig. Faner i bakgrunnen henter ikke data, slik at databasen kan gå i dvale.
 
 Ved godkjenning låses og kontrolleres begge oppgavene på nytt, og eierne endres i samme databasetransaksjon. Utførte, omfordelte eller utløpte oppgaver kan ikke byttes. Overlappende åpne forespørsler avvises. Et gjennomført bytte endrer ikke den faste rotasjonen. Planleggingsvisningen lagrer sammenhengende ukefordelinger åtte uker framover.
 

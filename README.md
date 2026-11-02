@@ -4,7 +4,7 @@ Mobilvennlig ukeplan med personlig innlogging og bekreftelse av utførte oppgave
 
 Se [DEPLOYMENT.md](DEPLOYMENT.md) for lokal oppstart, aktivering av de fem beboerne, tester og publisering på Vercel/Render/Neon.
 
-Eilif og Sigurd er administratorer. Andreas, Jørgen og Erlend er beboere. Prikkevisningen er fjernet; gamle data beholdes.
+Eilif og Sigurd er administratorer. Andreas, Jørgen og Erlend er beboere.
 
 ## Teknologi
 
